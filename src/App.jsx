@@ -1,0 +1,702 @@
+import { useState, useMemo, useRef, useEffect } from "react";
+
+const SALARY_CAP = 11550000;
+
+const POSITION_BANDS = {
+  "Halfback":    { min: 200000, max: 1500000, scarcity: 0.95 },
+  "Five-Eighth": { min: 180000, max: 1200000, scarcity: 0.88 },
+  "Hooker":      { min: 160000, max: 1000000, scarcity: 0.90 },
+  "Fullback":    { min: 180000, max: 1400000, scarcity: 0.92 },
+  "Centre":      { min: 130000, max: 750000,  scarcity: 0.72 },
+  "Winger":      { min: 130000, max: 650000,  scarcity: 0.68 },
+  "Prop":        { min: 150000, max: 1100000, scarcity: 0.78 },
+  "Back Row":    { min: 140000, max: 850000,  scarcity: 0.74 },
+  "Lock":        { min: 140000, max: 900000,  scarcity: 0.76 },
+};
+
+const CATEGORY_INFO = {
+  performance: {
+    title: "On-Field Performance", summary: "How much value does the player create on the field each week?",
+    metrics: [
+      { name: "Tackle Efficiency %",      weight: "25%", desc: "Successful tackles ÷ total attempts. High efficiency = fewer broken defensive sets." },
+      { name: "Missed Tackles / Game",    weight: "15%", desc: "Tackles missed per game. Lower is better — missed tackles directly lead to tries." },
+      { name: "Metres Per Carry",         weight: "20%", desc: "Run metres gained per touch. Measures attacking threat." },
+      { name: "Post-Contact Metres",      weight: "10%", desc: "Metres after first contact. Highlights hard runners who break tackles." },
+      { name: "Try Assists + Linebreaks", weight: "20%", desc: "Combined creative output — playmaking plus line-splitting." },
+      { name: "Errors / Game",            weight: "10%", desc: "Handling errors that give the ball back to the opposition." },
+    ],
+    note: "Stats are position-adjusted — props and halves aren't compared on the same raw numbers.",
+  },
+  durability: {
+    title: "Durability", summary: "Can the player take the field? Availability is everything under a hard cap.",
+    metrics: [
+      { name: "Games Played — 2024", weight: "⅓", desc: "Most recent season games played out of 27 rounds." },
+      { name: "Games Played — 2023", weight: "⅓", desc: "Prior season games played." },
+      { name: "Games Played — 2022", weight: "⅓", desc: "Two seasons ago. Three-year view smooths out one-off injury years." },
+    ],
+    note: "A $1.3M player who plays 13 games is worth half what their stat line suggests.",
+  },
+  scarcity: {
+    title: "Positional Scarcity", summary: "How hard is this player to replace in the market?",
+    metrics: [
+      { name: "Position Base Rate",  weight: "Main", desc: "How scarce elite players at this position are across all 17 clubs. Halfbacks (0.95) are rarer than wingers (0.68)." },
+      { name: "State of Origin",     weight: "+8%",  desc: "Selected for NSW or QLD in the last 2 years — top-26 positional quality nationally." },
+      { name: "Kangaroos Selection", weight: "+6%",  desc: "Selected for Australia — top-tier international recognition." },
+    ],
+    note: "Scarcity lifts the positional band floor. A rep halfback is valued higher than a club-only halfback with identical stats.",
+  },
+  nonPerf: {
+    title: "Non-Performance Value", summary: "What does the player bring beyond the stats?",
+    metrics: [
+      { name: "Age / Trajectory",    weight: "55%",  desc: "Younger players command a premium. Peak value at 22-23 (1.0×), tapering after 30 (0.55×)." },
+      { name: "Social Media Reach",  weight: "35%",  desc: "Instagram followers as a proxy for commercial marketability — jersey sales, sponsor activations, media value." },
+      { name: "Club Captain",        weight: "+10%", desc: "Captains provide leadership and media presence beyond what shows up in the stats." },
+    ],
+    note: "Lowest default weight (10%) but adjustable — agents would weight it higher, club analysts lower.",
+  },
+};
+
+const SEED_PLAYERS = [
+  {"name":"Reece Walsh","team":"Brisbane Broncos","position":"Fullback","age":23,"salary":950000,"games2024":24,"games2023":23,"games2022":20,"origin":true,"kangaroos":true,"captain":false,"instagram":520000,"tackleEff":92,"missedTackles":0.5,"metresPerCarry":9.5,"postContact":3.5,"tryAssists":10,"linebreaks":15,"errors":0.4,"kickMetres":110},
+  {"name":"Payne Haas","team":"Brisbane Broncos","position":"Prop","age":25,"salary":1200000,"games2024":24,"games2023":23,"games2022":22,"origin":true,"kangaroos":true,"captain":false,"instagram":95000,"tackleEff":94,"missedTackles":0.4,"metresPerCarry":8.8,"postContact":4.2,"tryAssists":1,"linebreaks":6,"errors":0.3,"kickMetres":0},
+  {"name":"Adam Reynolds","team":"Brisbane Broncos","position":"Halfback","age":34,"salary":650000,"games2024":19,"games2023":22,"games2022":23,"origin":false,"kangaroos":false,"captain":true,"instagram":78000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":6.8,"postContact":2.2,"tryAssists":14,"linebreaks":7,"errors":0.7,"kickMetres":380},
+  {"name":"Ezra Mam","team":"Brisbane Broncos","position":"Five-Eighth","age":22,"salary":450000,"games2024":18,"games2023":21,"games2022":12,"origin":true,"kangaroos":false,"captain":false,"instagram":145000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":8.2,"postContact":3.0,"tryAssists":11,"linebreaks":10,"errors":0.8,"kickMetres":120},
+  {"name":"Pat Carrigan","team":"Brisbane Broncos","position":"Lock","age":26,"salary":750000,"games2024":22,"games2023":23,"games2022":21,"origin":true,"kangaroos":true,"captain":false,"instagram":52000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.9,"postContact":3.5,"tryAssists":3,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Selwyn Cobbo","team":"Brisbane Broncos","position":"Winger","age":22,"salary":350000,"games2024":22,"games2023":20,"games2022":18,"origin":true,"kangaroos":false,"captain":false,"instagram":88000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":9.1,"postContact":3.3,"tryAssists":4,"linebreaks":14,"errors":0.5,"kickMetres":15},
+  {"name":"Kotoni Staggs","team":"Brisbane Broncos","position":"Centre","age":26,"salary":680000,"games2024":20,"games2023":17,"games2022":16,"origin":true,"kangaroos":false,"captain":false,"instagram":110000,"tackleEff":88,"missedTackles":0.9,"metresPerCarry":8.6,"postContact":3.4,"tryAssists":7,"linebreaks":11,"errors":0.5,"kickMetres":0},
+  {"name":"Blake Mozer","team":"Brisbane Broncos","position":"Winger","age":23,"salary":200000,"games2024":18,"games2023":14,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.4,"postContact":3.0,"tryAssists":3,"linebreaks":10,"errors":0.5,"kickMetres":0},
+  {"name":"Corey Oates","team":"Brisbane Broncos","position":"Winger","age":31,"salary":350000,"games2024":21,"games2023":22,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.5,"postContact":3.1,"tryAssists":3,"linebreaks":11,"errors":0.4,"kickMetres":0},
+  {"name":"Martin Taupau","team":"Brisbane Broncos","position":"Prop","age":34,"salary":500000,"games2024":19,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.1,"postContact":3.8,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Billy Walters","team":"Brisbane Broncos","position":"Hooker","age":27,"salary":500000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.5,"postContact":2.3,"tryAssists":10,"linebreaks":6,"errors":0.5,"kickMetres":20},
+  {"name":"Joseph Tapine","team":"Canberra Raiders","position":"Lock","age":29,"salary":850000,"games2024":23,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":48000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":8.5,"postContact":3.8,"tryAssists":3,"linebreaks":7,"errors":0.3,"kickMetres":0},
+  {"name":"Jamal Fogarty","team":"Canberra Raiders","position":"Halfback","age":30,"salary":600000,"games2024":22,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":true,"instagram":32000,"tackleEff":86,"missedTackles":1.0,"metresPerCarry":6.9,"postContact":2.4,"tryAssists":13,"linebreaks":7,"errors":0.7,"kickMetres":350},
+  {"name":"Kaeo Weekes","team":"Canberra Raiders","position":"Five-Eighth","age":22,"salary":280000,"games2024":20,"games2023":12,"games2022":4,"origin":false,"kangaroos":false,"captain":false,"instagram":25000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":7.8,"postContact":2.8,"tryAssists":9,"linebreaks":8,"errors":0.8,"kickMetres":80},
+  {"name":"Xavier Savage","team":"Canberra Raiders","position":"Fullback","age":22,"salary":280000,"games2024":21,"games2023":18,"games2022":9,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.3,"postContact":3.4,"tryAssists":7,"linebreaks":13,"errors":0.5,"kickMetres":90},
+  {"name":"Hudson Young","team":"Canberra Raiders","position":"Back Row","age":27,"salary":600000,"games2024":22,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":7.8,"postContact":3.2,"tryAssists":4,"linebreaks":6,"errors":0.5,"kickMetres":0},
+  {"name":"Elliott Whitehead","team":"Canberra Raiders","position":"Back Row","age":35,"salary":500000,"games2024":20,"games2023":21,"games2022":22,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.5,"postContact":3.3,"tryAssists":3,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Corey Horsburgh","team":"Canberra Raiders","position":"Prop","age":27,"salary":550000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.2,"postContact":3.9,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Tom Starling","team":"Canberra Raiders","position":"Hooker","age":27,"salary":500000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":92,"missedTackles":0.5,"metresPerCarry":6.6,"postContact":2.4,"tryAssists":9,"linebreaks":5,"errors":0.5,"kickMetres":15},
+  {"name":"Sebastian Kris","team":"Canberra Raiders","position":"Centre","age":26,"salary":380000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.3,"postContact":3.1,"tryAssists":5,"linebreaks":9,"errors":0.5,"kickMetres":0},
+  {"name":"Toby Sexton","team":"Canterbury Bulldogs","position":"Halfback","age":24,"salary":400000,"games2024":22,"games2023":16,"games2022":10,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.0,"postContact":2.5,"tryAssists":12,"linebreaks":7,"errors":0.8,"kickMetres":320},
+  {"name":"Bronson Xerri","team":"Canterbury Bulldogs","position":"Centre","age":24,"salary":450000,"games2024":21,"games2023":19,"games2022":0,"origin":false,"kangaroos":false,"captain":false,"instagram":55000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.3,"tryAssists":6,"linebreaks":10,"errors":0.5,"kickMetres":0},
+  {"name":"Josh Addo-Carr","team":"Canterbury Bulldogs","position":"Winger","age":29,"salary":700000,"games2024":22,"games2023":23,"games2022":24,"origin":true,"kangaroos":true,"captain":false,"instagram":285000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.0,"postContact":3.2,"tryAssists":4,"linebreaks":15,"errors":0.4,"kickMetres":0},
+  {"name":"Viliame Kikau","team":"Canterbury Bulldogs","position":"Back Row","age":29,"salary":750000,"games2024":21,"games2023":22,"games2022":23,"origin":true,"kangaroos":false,"captain":false,"instagram":68000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.9,"postContact":4.0,"tryAssists":4,"linebreaks":9,"errors":0.4,"kickMetres":0},
+  {"name":"Reed Mahoney","team":"Canterbury Bulldogs","position":"Hooker","age":26,"salary":650000,"games2024":22,"games2023":21,"games2022":20,"origin":true,"kangaroos":false,"captain":true,"instagram":42000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.5,"postContact":2.3,"tryAssists":11,"linebreaks":7,"errors":0.5,"kickMetres":20},
+  {"name":"Max King","team":"Canterbury Bulldogs","position":"Prop","age":28,"salary":550000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.0,"postContact":3.7,"tryAssists":1,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Jacob Preston","team":"Canterbury Bulldogs","position":"Back Row","age":24,"salary":380000,"games2024":20,"games2023":18,"games2022":15,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":7.5,"postContact":3.0,"tryAssists":3,"linebreaks":5,"errors":0.5,"kickMetres":0},
+  {"name":"Stephen Crichton","team":"Canterbury Bulldogs","position":"Centre","age":24,"salary":800000,"games2024":23,"games2023":24,"games2022":24,"origin":true,"kangaroos":false,"captain":false,"instagram":95000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.9,"postContact":3.5,"tryAssists":8,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Connor Tracey","team":"Canterbury Bulldogs","position":"Fullback","age":26,"salary":350000,"games2024":20,"games2023":18,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":25000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.5,"postContact":3.1,"tryAssists":6,"linebreaks":10,"errors":0.5,"kickMetres":80},
+  {"name":"Nicho Hynes","team":"Cronulla Sharks","position":"Halfback","age":28,"salary":900000,"games2024":24,"games2023":24,"games2022":23,"origin":true,"kangaroos":false,"captain":false,"instagram":88000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":7.6,"postContact":2.9,"tryAssists":17,"linebreaks":10,"errors":0.6,"kickMetres":360},
+  {"name":"Cameron McInnes","team":"Cronulla Sharks","position":"Hooker","age":31,"salary":700000,"games2024":21,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":true,"instagram":38000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.8,"postContact":2.5,"tryAssists":10,"linebreaks":6,"errors":0.4,"kickMetres":20},
+  {"name":"Braydon Trindall","team":"Cronulla Sharks","position":"Five-Eighth","age":25,"salary":400000,"games2024":22,"games2023":20,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.5,"postContact":2.7,"tryAssists":10,"linebreaks":8,"errors":0.7,"kickMetres":150},
+  {"name":"William Kennedy","team":"Cronulla Sharks","position":"Fullback","age":27,"salary":650000,"games2024":23,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":45000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":9.2,"postContact":3.4,"tryAssists":8,"linebreaks":13,"errors":0.4,"kickMetres":100},
+  {"name":"Briton Nikora","team":"Cronulla Sharks","position":"Back Row","age":26,"salary":550000,"games2024":21,"games2023":20,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":7.9,"postContact":3.4,"tryAssists":4,"linebreaks":7,"errors":0.5,"kickMetres":0},
+  {"name":"Siosifa Talakai","team":"Cronulla Sharks","position":"Centre","age":27,"salary":600000,"games2024":20,"games2023":21,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":55000,"tackleEff":88,"missedTackles":0.9,"metresPerCarry":9.3,"postContact":4.1,"tryAssists":5,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Toby Rudolf","team":"Cronulla Sharks","position":"Prop","age":27,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.2,"postContact":3.8,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Teig Wilton","team":"Cronulla Sharks","position":"Back Row","age":27,"salary":500000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.7,"postContact":3.2,"tryAssists":3,"linebreaks":6,"errors":0.4,"kickMetres":0},
+  {"name":"Ronaldo Mulitalo","team":"Cronulla Sharks","position":"Winger","age":25,"salary":380000,"games2024":21,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.9,"postContact":3.2,"tryAssists":4,"linebreaks":13,"errors":0.5,"kickMetres":0},
+  {"name":"Tino Fa'asuamaleaui","team":"Gold Coast Titans","position":"Prop","age":25,"salary":1200000,"games2024":22,"games2023":20,"games2022":21,"origin":true,"kangaroos":false,"captain":true,"instagram":72000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":8.4,"postContact":4.0,"tryAssists":1,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Kieran Foran","team":"Gold Coast Titans","position":"Five-Eighth","age":34,"salary":500000,"games2024":18,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":45000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":6.5,"postContact":2.2,"tryAssists":10,"linebreaks":5,"errors":0.7,"kickMetres":180},
+  {"name":"Jayden Campbell","team":"Gold Coast Titans","position":"Fullback","age":23,"salary":400000,"games2024":21,"games2023":19,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":45000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.0,"postContact":3.3,"tryAssists":7,"linebreaks":12,"errors":0.5,"kickMetres":100},
+  {"name":"AJ Brimson","team":"Gold Coast Titans","position":"Fullback","age":27,"salary":600000,"games2024":20,"games2023":21,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":55000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":9.2,"postContact":3.5,"tryAssists":9,"linebreaks":13,"errors":0.4,"kickMetres":110},
+  {"name":"Tanah Boyd","team":"Gold Coast Titans","position":"Halfback","age":24,"salary":380000,"games2024":20,"games2023":17,"games2022":12,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":6.8,"postContact":2.4,"tryAssists":11,"linebreaks":6,"errors":0.8,"kickMetres":310},
+  {"name":"David Fifita","team":"Gold Coast Titans","position":"Back Row","age":25,"salary":850000,"games2024":20,"games2023":18,"games2022":19,"origin":true,"kangaroos":false,"captain":false,"instagram":125000,"tackleEff":89,"missedTackles":0.9,"metresPerCarry":9.8,"postContact":4.5,"tryAssists":4,"linebreaks":11,"errors":0.6,"kickMetres":0},
+  {"name":"Sam Lisone","team":"Gold Coast Titans","position":"Prop","age":30,"salary":450000,"games2024":19,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":7.9,"postContact":3.6,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Beau Fermor","team":"Gold Coast Titans","position":"Back Row","age":25,"salary":450000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":7.8,"postContact":3.3,"tryAssists":3,"linebreaks":6,"errors":0.5,"kickMetres":0},
+  {"name":"Alofiana Khan-Pereira","team":"Gold Coast Titans","position":"Winger","age":23,"salary":250000,"games2024":19,"games2023":16,"games2022":10,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":4,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Tom Trbojevic","team":"Manly Sea Eagles","position":"Fullback","age":28,"salary":1250000,"games2024":15,"games2023":14,"games2022":11,"origin":true,"kangaroos":true,"captain":false,"instagram":195000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":9.8,"postContact":3.6,"tryAssists":9,"linebreaks":13,"errors":0.4,"kickMetres":80},
+  {"name":"Daly Cherry-Evans","team":"Manly Sea Eagles","position":"Halfback","age":35,"salary":900000,"games2024":22,"games2023":23,"games2022":22,"origin":true,"kangaroos":true,"captain":true,"instagram":92000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":6.8,"postContact":2.3,"tryAssists":13,"linebreaks":7,"errors":0.6,"kickMetres":400},
+  {"name":"Luke Brooks","team":"Manly Sea Eagles","position":"Five-Eighth","age":29,"salary":600000,"games2024":21,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.2,"postContact":2.6,"tryAssists":11,"linebreaks":8,"errors":0.7,"kickMetres":160},
+  {"name":"Jake Trbojevic","team":"Manly Sea Eagles","position":"Lock","age":30,"salary":800000,"games2024":22,"games2023":22,"games2022":21,"origin":true,"kangaroos":true,"captain":false,"instagram":65000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.6,"postContact":3.2,"tryAssists":3,"linebreaks":5,"errors":0.3,"kickMetres":0},
+  {"name":"Haumole Olakau'atu","team":"Manly Sea Eagles","position":"Back Row","age":26,"salary":700000,"games2024":21,"games2023":22,"games2022":20,"origin":true,"kangaroos":true,"captain":false,"instagram":48000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.3,"postContact":3.7,"tryAssists":4,"linebreaks":8,"errors":0.4,"kickMetres":0},
+  {"name":"Reuben Garrick","team":"Manly Sea Eagles","position":"Winger","age":28,"salary":500000,"games2024":21,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.0,"postContact":3.1,"tryAssists":5,"linebreaks":13,"errors":0.4,"kickMetres":15},
+  {"name":"Christian Tuipulotu","team":"Manly Sea Eagles","position":"Centre","age":24,"salary":400000,"games2024":22,"games2023":20,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.7,"postContact":3.3,"tryAssists":6,"linebreaks":10,"errors":0.5,"kickMetres":0},
+  {"name":"Tolutau Koula","team":"Manly Sea Eagles","position":"Winger","age":22,"salary":250000,"games2024":20,"games2023":17,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.9,"postContact":3.2,"tryAssists":3,"linebreaks":11,"errors":0.5,"kickMetres":0},
+  {"name":"Jahrome Hughes","team":"Melbourne Storm","position":"Halfback","age":29,"salary":1600000,"games2024":24,"games2023":24,"games2022":23,"origin":true,"kangaroos":true,"captain":false,"instagram":98000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.2,"postContact":3.1,"tryAssists":18,"linebreaks":11,"errors":0.4,"kickMetres":380},
+  {"name":"Cameron Munster","team":"Melbourne Storm","position":"Five-Eighth","age":29,"salary":1100000,"games2024":24,"games2023":22,"games2022":23,"origin":true,"kangaroos":true,"captain":false,"instagram":175000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.5,"postContact":3.3,"tryAssists":13,"linebreaks":10,"errors":0.5,"kickMetres":180},
+  {"name":"Harry Grant","team":"Melbourne Storm","position":"Hooker","age":26,"salary":900000,"games2024":22,"games2023":21,"games2022":20,"origin":true,"kangaroos":true,"captain":false,"instagram":62000,"tackleEff":95,"missedTackles":0.3,"metresPerCarry":6.8,"postContact":2.4,"tryAssists":14,"linebreaks":8,"errors":0.4,"kickMetres":40},
+  {"name":"Ryan Papenhuyzen","team":"Melbourne Storm","position":"Fullback","age":26,"salary":800000,"games2024":19,"games2023":15,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":91000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":10.1,"postContact":3.9,"tryAssists":9,"linebreaks":14,"errors":0.5,"kickMetres":100},
+  {"name":"Trent Loiero","team":"Melbourne Storm","position":"Back Row","age":27,"salary":450000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.6,"postContact":3.1,"tryAssists":3,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Bronson Garlick","team":"Melbourne Storm","position":"Prop","age":25,"salary":380000,"games2024":20,"games2023":18,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":15000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.0,"postContact":3.6,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Nick Meaney","team":"Melbourne Storm","position":"Centre","age":27,"salary":400000,"games2024":21,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.4,"postContact":3.0,"tryAssists":6,"linebreaks":9,"errors":0.5,"kickMetres":0},
+  {"name":"Grant Anderson","team":"Melbourne Storm","position":"Winger","age":24,"salary":280000,"games2024":20,"games2023":17,"games2022":12,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":89,"missedTackles":0.7,"metresPerCarry":8.7,"postContact":3.0,"tryAssists":4,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Christian Welch","team":"Melbourne Storm","position":"Prop","age":29,"salary":600000,"games2024":21,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":true,"instagram":32000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.2,"postContact":3.8,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Eli Katoa","team":"Melbourne Storm","position":"Winger","age":24,"salary":300000,"games2024":20,"games2023":18,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":89,"missedTackles":0.7,"metresPerCarry":9.0,"postContact":3.1,"tryAssists":4,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Kalyn Ponga","team":"Newcastle Knights","position":"Fullback","age":26,"salary":1300000,"games2024":18,"games2023":16,"games2022":14,"origin":true,"kangaroos":true,"captain":true,"instagram":280000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":10.2,"postContact":3.8,"tryAssists":11,"linebreaks":16,"errors":0.5,"kickMetres":90},
+  {"name":"Dylan Brown","team":"Newcastle Knights","position":"Halfback","age":24,"salary":1600000,"games2024":22,"games2023":23,"games2022":22,"origin":true,"kangaroos":false,"captain":false,"instagram":95000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":7.8,"postContact":2.9,"tryAssists":16,"linebreaks":10,"errors":0.6,"kickMetres":370},
+  {"name":"Tyson Gamble","team":"Newcastle Knights","position":"Five-Eighth","age":27,"salary":500000,"games2024":21,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.3,"postContact":2.6,"tryAssists":10,"linebreaks":7,"errors":0.7,"kickMetres":140},
+  {"name":"David Armstrong","team":"Newcastle Knights","position":"Winger","age":24,"salary":300000,"games2024":21,"games2023":19,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":9.0,"postContact":3.2,"tryAssists":4,"linebreaks":13,"errors":0.5,"kickMetres":0},
+  {"name":"Dane Gagai","team":"Newcastle Knights","position":"Winger","age":34,"salary":550000,"games2024":20,"games2023":21,"games2022":22,"origin":true,"kangaroos":true,"captain":false,"instagram":62000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":4,"linebreaks":11,"errors":0.4,"kickMetres":0},
+  {"name":"Phoenix Crossland","team":"Newcastle Knights","position":"Halfback","age":23,"salary":280000,"games2024":18,"games2023":14,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":6.7,"postContact":2.3,"tryAssists":9,"linebreaks":6,"errors":0.8,"kickMetres":280},
+  {"name":"Leo Thompson","team":"Newcastle Knights","position":"Back Row","age":24,"salary":350000,"games2024":20,"games2023":18,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":7.7,"postContact":3.2,"tryAssists":3,"linebreaks":5,"errors":0.5,"kickMetres":0},
+  {"name":"Jack Cogger","team":"Newcastle Knights","position":"Five-Eighth","age":28,"salary":450000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.1,"postContact":2.5,"tryAssists":9,"linebreaks":7,"errors":0.7,"kickMetres":130},
+  {"name":"Jacob Saifiti","team":"Newcastle Knights","position":"Prop","age":28,"salary":600000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":25000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.3,"postContact":3.9,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Shaun Johnson","team":"New Zealand Warriors","position":"Halfback","age":34,"salary":750000,"games2024":22,"games2023":23,"games2022":22,"origin":false,"kangaroos":false,"captain":false,"instagram":82000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":6.9,"postContact":2.3,"tryAssists":14,"linebreaks":8,"errors":0.7,"kickMetres":370},
+  {"name":"Luke Metcalf","team":"New Zealand Warriors","position":"Five-Eighth","age":23,"salary":380000,"games2024":21,"games2023":19,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":84,"missedTackles":1.0,"metresPerCarry":7.5,"postContact":2.7,"tryAssists":10,"linebreaks":8,"errors":0.7,"kickMetres":140},
+  {"name":"Roger Tuivasa-Sheck","team":"New Zealand Warriors","position":"Centre","age":31,"salary":750000,"games2024":22,"games2023":21,"games2022":0,"origin":false,"kangaroos":false,"captain":true,"instagram":95000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.9,"postContact":3.3,"tryAssists":6,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Tohu Harris","team":"New Zealand Warriors","position":"Lock","age":31,"salary":700000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":48000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.8,"postContact":3.2,"tryAssists":4,"linebreaks":6,"errors":0.4,"kickMetres":0},
+  {"name":"Marata Niukore","team":"New Zealand Warriors","position":"Back Row","age":26,"salary":500000,"games2024":21,"games2023":20,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.0,"postContact":3.5,"tryAssists":3,"linebreaks":7,"errors":0.5,"kickMetres":0},
+  {"name":"Wayde Egan","team":"New Zealand Warriors","position":"Hooker","age":30,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":6.5,"postContact":2.3,"tryAssists":8,"linebreaks":5,"errors":0.5,"kickMetres":15},
+  {"name":"Addin Fonoti-Havili","team":"New Zealand Warriors","position":"Prop","age":27,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.1,"postContact":3.7,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Adam Pompey","team":"New Zealand Warriors","position":"Winger","age":24,"salary":280000,"games2024":19,"games2023":16,"games2022":11,"origin":false,"kangaroos":false,"captain":false,"instagram":25000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":4,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Rocco Berry","team":"New Zealand Warriors","position":"Fullback","age":23,"salary":280000,"games2024":19,"games2023":14,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":89,"missedTackles":0.7,"metresPerCarry":8.8,"postContact":3.1,"tryAssists":6,"linebreaks":11,"errors":0.5,"kickMetres":85},
+  {"name":"Chad Townsend","team":"North Queensland Cowboys","position":"Halfback","age":33,"salary":650000,"games2024":22,"games2023":23,"games2022":22,"origin":false,"kangaroos":false,"captain":true,"instagram":45000,"tackleEff":86,"missedTackles":1.0,"metresPerCarry":6.8,"postContact":2.3,"tryAssists":13,"linebreaks":7,"errors":0.7,"kickMetres":360},
+  {"name":"Tom Dearden","team":"North Queensland Cowboys","position":"Five-Eighth","age":23,"salary":500000,"games2024":22,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.4,"postContact":2.7,"tryAssists":11,"linebreaks":8,"errors":0.7,"kickMetres":160},
+  {"name":"Scott Drinkwater","team":"North Queensland Cowboys","position":"Fullback","age":26,"salary":650000,"games2024":22,"games2023":22,"games2022":20,"origin":true,"kangaroos":false,"captain":false,"instagram":52000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":9.5,"postContact":3.5,"tryAssists":9,"linebreaks":14,"errors":0.4,"kickMetres":110},
+  {"name":"Jason Taumalolo","team":"North Queensland Cowboys","position":"Lock","age":31,"salary":950000,"games2024":20,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":75000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":9.2,"postContact":4.5,"tryAssists":2,"linebreaks":7,"errors":0.4,"kickMetres":0},
+  {"name":"Reuben Cotter","team":"North Queensland Cowboys","position":"Hooker","age":25,"salary":550000,"games2024":23,"games2023":22,"games2022":21,"origin":true,"kangaroos":true,"captain":false,"instagram":38000,"tackleEff":94,"missedTackles":0.4,"metresPerCarry":6.9,"postContact":2.5,"tryAssists":10,"linebreaks":6,"errors":0.4,"kickMetres":20},
+  {"name":"Heilum Luki","team":"North Queensland Cowboys","position":"Back Row","age":22,"salary":280000,"games2024":20,"games2023":16,"games2022":8,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":90,"missedTackles":0.8,"metresPerCarry":7.8,"postContact":3.3,"tryAssists":3,"linebreaks":6,"errors":0.5,"kickMetres":0},
+  {"name":"Kyle Feldt","team":"North Queensland Cowboys","position":"Winger","age":32,"salary":450000,"games2024":21,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":4,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Jeremiah Nanai","team":"North Queensland Cowboys","position":"Centre","age":22,"salary":350000,"games2024":21,"games2023":20,"games2022":16,"origin":true,"kangaroos":false,"captain":false,"instagram":48000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":9.0,"postContact":3.5,"tryAssists":5,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Reece Robson","team":"North Queensland Cowboys","position":"Hooker","age":27,"salary":480000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.5,"postContact":2.3,"tryAssists":9,"linebreaks":5,"errors":0.5,"kickMetres":15},
+  {"name":"Mitchell Moses","team":"Parramatta Eels","position":"Halfback","age":29,"salary":1300000,"games2024":23,"games2023":20,"games2022":22,"origin":false,"kangaroos":false,"captain":true,"instagram":145000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":7.4,"postContact":2.6,"tryAssists":16,"linebreaks":9,"errors":0.7,"kickMetres":390},
+  {"name":"Isaiah Papali'i","team":"Parramatta Eels","position":"Back Row","age":26,"salary":750000,"games2024":22,"games2023":21,"games2022":23,"origin":true,"kangaroos":false,"captain":false,"instagram":55000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.1,"postContact":3.6,"tryAssists":2,"linebreaks":8,"errors":0.4,"kickMetres":0},
+  {"name":"Clint Gutherson","team":"Parramatta Eels","position":"Fullback","age":30,"salary":850000,"games2024":22,"games2023":23,"games2022":24,"origin":true,"kangaroos":false,"captain":false,"instagram":88000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.9,"postContact":3.2,"tryAssists":10,"linebreaks":12,"errors":0.4,"kickMetres":95},
+  {"name":"Junior Paulo","team":"Parramatta Eels","position":"Prop","age":30,"salary":700000,"games2024":21,"games2023":21,"games2022":22,"origin":true,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.5,"postContact":4.0,"tryAssists":0,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Daejarn Asi","team":"Parramatta Eels","position":"Five-Eighth","age":25,"salary":450000,"games2024":21,"games2023":19,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.6,"postContact":2.8,"tryAssists":9,"linebreaks":8,"errors":0.7,"kickMetres":130},
+  {"name":"Will Penisini","team":"Parramatta Eels","position":"Winger","age":24,"salary":380000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.7,"postContact":3.1,"tryAssists":4,"linebreaks":11,"errors":0.5,"kickMetres":0},
+  {"name":"Bryce Cartwright","team":"Parramatta Eels","position":"Back Row","age":29,"salary":450000,"games2024":19,"games2023":18,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":7.6,"postContact":3.0,"tryAssists":3,"linebreaks":5,"errors":0.5,"kickMetres":0},
+  {"name":"Nathan Cleary","team":"Penrith Panthers","position":"Halfback","age":26,"salary":1300000,"games2024":13,"games2023":22,"games2022":22,"origin":true,"kangaroos":true,"captain":false,"instagram":320000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":7.1,"postContact":2.8,"tryAssists":14,"linebreaks":8,"errors":0.6,"kickMetres":420},
+  {"name":"Jarome Luai","team":"Wests Tigers","position":"Halfback","age":27,"salary":1200000,"games2024":22,"games2023":21,"games2022":22,"origin":true,"kangaroos":false,"captain":false,"instagram":168000,"tackleEff":86,"missedTackles":1.0,"metresPerCarry":7.0,"postContact":2.5,"tryAssists":15,"linebreaks":9,"errors":0.8,"kickMetres":350},
+  {"name":"Liam Martin","team":"Penrith Panthers","position":"Back Row","age":27,"salary":520000,"games2024":23,"games2023":22,"games2022":24,"origin":true,"kangaroos":false,"captain":false,"instagram":48000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.8,"postContact":3.4,"tryAssists":3,"linebreaks":7,"errors":0.4,"kickMetres":10},
+  {"name":"James Fisher-Harris","team":"Penrith Panthers","position":"Prop","age":29,"salary":850000,"games2024":23,"games2023":22,"games2022":23,"origin":true,"kangaroos":true,"captain":true,"instagram":52000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":8.5,"postContact":4.0,"tryAssists":1,"linebreaks":5,"errors":0.3,"kickMetres":0},
+  {"name":"Scott Sorensen","team":"Penrith Panthers","position":"Back Row","age":29,"salary":550000,"games2024":22,"games2023":22,"games2022":23,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.7,"postContact":3.3,"tryAssists":3,"linebreaks":6,"errors":0.4,"kickMetres":0},
+  {"name":"Dylan Edwards","team":"Penrith Panthers","position":"Fullback","age":28,"salary":700000,"games2024":22,"games2023":23,"games2022":24,"origin":true,"kangaroos":false,"captain":false,"instagram":65000,"tackleEff":92,"missedTackles":0.5,"metresPerCarry":9.2,"postContact":3.3,"tryAssists":9,"linebreaks":13,"errors":0.4,"kickMetres":90},
+  {"name":"Brian To'o","team":"Penrith Panthers","position":"Winger","age":26,"salary":550000,"games2024":22,"games2023":23,"games2022":24,"origin":true,"kangaroos":true,"captain":false,"instagram":98000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":9.5,"postContact":3.6,"tryAssists":4,"linebreaks":16,"errors":0.4,"kickMetres":0},
+  {"name":"Izack Tago","team":"Penrith Panthers","position":"Centre","age":23,"salary":450000,"games2024":22,"games2023":23,"games2022":20,"origin":true,"kangaroos":false,"captain":false,"instagram":62000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.1,"postContact":3.5,"tryAssists":6,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Isaah Yeo","team":"Penrith Panthers","position":"Lock","age":29,"salary":700000,"games2024":22,"games2023":23,"games2022":24,"origin":true,"kangaroos":true,"captain":false,"instagram":42000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.8,"postContact":3.4,"tryAssists":4,"linebreaks":6,"errors":0.3,"kickMetres":0},
+  {"name":"Mitch Kenny","team":"Penrith Panthers","position":"Hooker","age":25,"salary":380000,"games2024":21,"games2023":20,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.6,"postContact":2.3,"tryAssists":9,"linebreaks":5,"errors":0.5,"kickMetres":15},
+  {"name":"Latrell Mitchell","team":"South Sydney Rabbitohs","position":"Fullback","age":27,"salary":1100000,"games2024":20,"games2023":18,"games2022":17,"origin":true,"kangaroos":true,"captain":false,"instagram":230000,"tackleEff":88,"missedTackles":0.9,"metresPerCarry":9.3,"postContact":3.7,"tryAssists":8,"linebreaks":12,"errors":0.6,"kickMetres":60},
+  {"name":"Alex Johnston","team":"South Sydney Rabbitohs","position":"Winger","age":30,"salary":380000,"games2024":24,"games2023":24,"games2022":23,"origin":false,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.9,"postContact":3.2,"tryAssists":5,"linebreaks":18,"errors":0.3,"kickMetres":20},
+  {"name":"Lachlan Ilias","team":"South Sydney Rabbitohs","position":"Halfback","age":23,"salary":400000,"games2024":21,"games2023":20,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":6.9,"postContact":2.4,"tryAssists":11,"linebreaks":6,"errors":0.8,"kickMetres":310},
+  {"name":"Cody Walker","team":"South Sydney Rabbitohs","position":"Five-Eighth","age":34,"salary":650000,"games2024":21,"games2023":22,"games2022":22,"origin":false,"kangaroos":false,"captain":true,"instagram":68000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.8,"postContact":2.9,"tryAssists":12,"linebreaks":9,"errors":0.7,"kickMetres":140},
+  {"name":"Cameron Murray","team":"South Sydney Rabbitohs","position":"Lock","age":27,"salary":800000,"games2024":22,"games2023":21,"games2022":22,"origin":true,"kangaroos":true,"captain":false,"instagram":55000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.7,"postContact":3.3,"tryAssists":4,"linebreaks":6,"errors":0.3,"kickMetres":0},
+  {"name":"Tom Burgess","team":"South Sydney Rabbitohs","position":"Prop","age":32,"salary":600000,"games2024":21,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.0,"postContact":3.8,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Tevita Tatola","team":"South Sydney Rabbitohs","position":"Prop","age":26,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.2,"postContact":3.9,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Jaxson Paulo","team":"South Sydney Rabbitohs","position":"Winger","age":24,"salary":280000,"games2024":19,"games2023":16,"games2022":12,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.6,"postContact":3.0,"tryAssists":4,"linebreaks":11,"errors":0.5,"kickMetres":0},
+  {"name":"Jack Wighton","team":"South Sydney Rabbitohs","position":"Centre","age":30,"salary":550000,"games2024":20,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.2,"postContact":3.1,"tryAssists":7,"linebreaks":9,"errors":0.5,"kickMetres":0},
+  {"name":"Kyle Flanagan","team":"St George Illawarra Dragons","position":"Halfback","age":25,"salary":600000,"games2024":22,"games2023":21,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":7.0,"postContact":2.5,"tryAssists":13,"linebreaks":7,"errors":0.7,"kickMetres":350},
+  {"name":"Ben Hunt","team":"St George Illawarra Dragons","position":"Halfback","age":34,"salary":800000,"games2024":22,"games2023":23,"games2022":22,"origin":true,"kangaroos":true,"captain":true,"instagram":65000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":7.1,"postContact":2.5,"tryAssists":13,"linebreaks":7,"errors":0.6,"kickMetres":360},
+  {"name":"Jaydn Su'A","team":"St George Illawarra Dragons","position":"Back Row","age":27,"salary":600000,"games2024":21,"games2023":20,"games2022":19,"origin":true,"kangaroos":false,"captain":false,"instagram":42000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.1,"postContact":3.5,"tryAssists":4,"linebreaks":7,"errors":0.4,"kickMetres":0},
+  {"name":"Moses Suli","team":"St George Illawarra Dragons","position":"Centre","age":26,"salary":550000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":88,"missedTackles":0.9,"metresPerCarry":8.8,"postContact":3.4,"tryAssists":5,"linebreaks":10,"errors":0.5,"kickMetres":0},
+  {"name":"Mikaele Ravalawa","team":"St George Illawarra Dragons","position":"Winger","age":27,"salary":400000,"games2024":20,"games2023":21,"games2022":19,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":9.1,"postContact":3.2,"tryAssists":3,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Talatau Amone","team":"St George Illawarra Dragons","position":"Five-Eighth","age":22,"salary":350000,"games2024":20,"games2023":18,"games2022":15,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":84,"missedTackles":1.1,"metresPerCarry":7.3,"postContact":2.6,"tryAssists":9,"linebreaks":7,"errors":0.8,"kickMetres":130},
+  {"name":"Tyrell Sloan","team":"St George Illawarra Dragons","position":"Fullback","age":22,"salary":350000,"games2024":21,"games2023":20,"games2022":16,"origin":false,"kangaroos":false,"captain":false,"instagram":45000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.2,"postContact":3.4,"tryAssists":7,"linebreaks":12,"errors":0.5,"kickMetres":90},
+  {"name":"Francis Molo","team":"St George Illawarra Dragons","position":"Prop","age":26,"salary":450000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.1,"postContact":3.7,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"James Tedesco","team":"Sydney Roosters","position":"Fullback","age":31,"salary":1100000,"games2024":22,"games2023":24,"games2022":21,"origin":true,"kangaroos":true,"captain":false,"instagram":210000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":9.1,"postContact":3.4,"tryAssists":12,"linebreaks":14,"errors":0.3,"kickMetres":120},
+  {"name":"Sam Walker","team":"Sydney Roosters","position":"Halfback","age":22,"salary":700000,"games2024":23,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":82000,"tackleEff":85,"missedTackles":1.1,"metresPerCarry":7.2,"postContact":2.7,"tryAssists":13,"linebreaks":7,"errors":0.7,"kickMetres":330},
+  {"name":"Joseph Manu","team":"Sydney Roosters","position":"Centre","age":27,"salary":680000,"games2024":22,"games2023":20,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":58000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":8.7,"postContact":3.5,"tryAssists":6,"linebreaks":11,"errors":0.4,"kickMetres":15},
+  {"name":"Luke Keary","team":"Sydney Roosters","position":"Five-Eighth","age":32,"salary":700000,"games2024":20,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":true,"instagram":48000,"tackleEff":87,"missedTackles":0.9,"metresPerCarry":7.2,"postContact":2.7,"tryAssists":11,"linebreaks":8,"errors":0.6,"kickMetres":170},
+  {"name":"Nat Butcher","team":"Sydney Roosters","position":"Back Row","age":27,"salary":600000,"games2024":22,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.7,"postContact":3.2,"tryAssists":3,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Victor Radley","team":"Sydney Roosters","position":"Lock","age":27,"salary":700000,"games2024":21,"games2023":20,"games2022":19,"origin":true,"kangaroos":false,"captain":false,"instagram":52000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":8.0,"postContact":3.4,"tryAssists":3,"linebreaks":6,"errors":0.4,"kickMetres":0},
+  {"name":"Jared Waerea-Hargreaves","team":"Sydney Roosters","position":"Prop","age":35,"salary":700000,"games2024":18,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":45000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":8.0,"postContact":3.8,"tryAssists":0,"linebreaks":4,"errors":0.4,"kickMetres":0},
+  {"name":"Daniel Tupou","team":"Sydney Roosters","position":"Winger","age":32,"salary":450000,"games2024":21,"games2023":22,"games2022":21,"origin":false,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":4,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Brandon Smith","team":"Sydney Roosters","position":"Hooker","age":27,"salary":750000,"games2024":21,"games2023":22,"games2022":20,"origin":true,"kangaroos":false,"captain":false,"instagram":65000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":7.2,"postContact":2.8,"tryAssists":11,"linebreaks":7,"errors":0.4,"kickMetres":25},
+  {"name":"Api Koroisau","team":"Wests Tigers","position":"Hooker","age":32,"salary":700000,"games2024":20,"games2023":21,"games2022":21,"origin":true,"kangaroos":false,"captain":true,"instagram":42000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.6,"postContact":2.4,"tryAssists":10,"linebreaks":6,"errors":0.4,"kickMetres":20},
+  {"name":"Apisai Koroisau","team":"Wests Tigers","position":"Hooker","age":32,"salary":700000,"games2024":20,"games2023":21,"games2022":21,"origin":true,"kangaroos":false,"captain":true,"instagram":42000,"tackleEff":93,"missedTackles":0.5,"metresPerCarry":6.6,"postContact":2.4,"tryAssists":10,"linebreaks":6,"errors":0.4,"kickMetres":20},
+  {"name":"Lachlan Galvin","team":"Wests Tigers","position":"Five-Eighth","age":18,"salary":300000,"games2024":18,"games2023":0,"games2022":0,"origin":false,"kangaroos":false,"captain":false,"instagram":55000,"tackleEff":82,"missedTackles":1.2,"metresPerCarry":7.5,"postContact":2.6,"tryAssists":8,"linebreaks":7,"errors":0.9,"kickMetres":100},
+  {"name":"David Nofoaluma","team":"Wests Tigers","position":"Winger","age":30,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.9,"postContact":3.1,"tryAssists":4,"linebreaks":12,"errors":0.5,"kickMetres":0},
+  {"name":"Justin Olam","team":"Wests Tigers","position":"Centre","age":29,"salary":500000,"games2024":19,"games2023":18,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.6,"postContact":3.3,"tryAssists":5,"linebreaks":10,"errors":0.5,"kickMetres":0},
+  {"name":"Stefano Utoikamanu","team":"Wests Tigers","position":"Prop","age":23,"salary":600000,"games2024":21,"games2023":20,"games2022":18,"origin":true,"kangaroos":false,"captain":false,"instagram":35000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.6,"postContact":4.1,"tryAssists":0,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Daine Laurie","team":"Wests Tigers","position":"Fullback","age":24,"salary":380000,"games2024":19,"games2023":17,"games2022":15,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.7,"postContact":3.1,"tryAssists":6,"linebreaks":10,"errors":0.5,"kickMetres":80},
+  {"name":"Wayne Bennett","team":"Dolphins","position":"Halfback","age":28,"salary":700000,"games2024":21,"games2023":20,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":32000,"tackleEff":86,"missedTackles":1.0,"metresPerCarry":7.1,"postContact":2.5,"tryAssists":12,"linebreaks":7,"errors":0.7,"kickMetres":340},
+  {"name":"Herbie Farnworth","team":"Dolphins","position":"Centre","age":25,"salary":650000,"games2024":22,"games2023":21,"games2022":20,"origin":true,"kangaroos":false,"captain":false,"instagram":65000,"tackleEff":91,"missedTackles":0.6,"metresPerCarry":9.0,"postContact":3.4,"tryAssists":7,"linebreaks":12,"errors":0.4,"kickMetres":0},
+  {"name":"Valynce Te Whare","team":"Dolphins","position":"Winger","age":25,"salary":280000,"games2024":20,"games2023":18,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":22000,"tackleEff":88,"missedTackles":0.8,"metresPerCarry":8.8,"postContact":3.0,"tryAssists":3,"linebreaks":11,"errors":0.5,"kickMetres":0},
+  {"name":"Sean O'Sullivan","team":"Dolphins","position":"Halfback","age":26,"salary":450000,"games2024":21,"games2023":20,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":25000,"tackleEff":85,"missedTackles":1.0,"metresPerCarry":6.9,"postContact":2.4,"tryAssists":11,"linebreaks":6,"errors":0.7,"kickMetres":330},
+  {"name":"Kenny Bromwich","team":"Dolphins","position":"Lock","age":30,"salary":550000,"games2024":20,"games2023":21,"games2022":20,"origin":false,"kangaroos":false,"captain":true,"instagram":25000,"tackleEff":92,"missedTackles":0.6,"metresPerCarry":7.7,"postContact":3.2,"tryAssists":3,"linebreaks":5,"errors":0.4,"kickMetres":0},
+  {"name":"Tom Gilbert","team":"Dolphins","position":"Back Row","age":27,"salary":450000,"games2024":20,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":7.8,"postContact":3.2,"tryAssists":3,"linebreaks":6,"errors":0.5,"kickMetres":0},
+  {"name":"Max Plath","team":"Dolphins","position":"Prop","age":25,"salary":380000,"games2024":20,"games2023":18,"games2022":14,"origin":false,"kangaroos":false,"captain":false,"instagram":15000,"tackleEff":91,"missedTackles":0.7,"metresPerCarry":8.1,"postContact":3.7,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Jake Averillo","team":"Dolphins","position":"Centre","age":24,"salary":400000,"games2024":20,"games2023":18,"games2022":15,"origin":false,"kangaroos":false,"captain":false,"instagram":28000,"tackleEff":89,"missedTackles":0.8,"metresPerCarry":8.3,"postContact":3.0,"tryAssists":5,"linebreaks":9,"errors":0.5,"kickMetres":0},
+  {"name":"Mark Nicholls","team":"Dolphins","position":"Prop","age":33,"salary":450000,"games2024":18,"games2023":19,"games2022":17,"origin":false,"kangaroos":false,"captain":false,"instagram":18000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":7.9,"postContact":3.6,"tryAssists":0,"linebreaks":3,"errors":0.4,"kickMetres":0},
+  {"name":"Jamayne Isaako","team":"Dolphins","position":"Fullback","age":27,"salary":500000,"games2024":20,"games2023":19,"games2022":18,"origin":false,"kangaroos":false,"captain":false,"instagram":38000,"tackleEff":90,"missedTackles":0.7,"metresPerCarry":9.0,"postContact":3.2,"tryAssists":7,"linebreaks":12,"errors":0.4,"kickMetres":100}
+];
+
+function calcPerformanceScore(p) {
+  return (p.tackleEff/100)*0.25 + Math.max(0,1-p.missedTackles/3)*0.15 +
+    Math.min(p.metresPerCarry/12,1)*0.20 + Math.min(p.postContact/5,1)*0.10 +
+    Math.min((p.tryAssists+p.linebreaks)/35,1)*0.20 + Math.max(0,1-p.errors/2)*0.10;
+}
+function calcDurabilityScore(p) {
+  return Math.min(((p.games2024+p.games2023+p.games2022)/3)/24,1);
+}
+function calcScarcityScore(p) {
+  const base=(POSITION_BANDS[p.position]?.scarcity)||0.75;
+  return Math.min(base+(p.origin?0.08:0)+(p.kangaroos?0.06:0),1);
+}
+function calcNonPerfScore(p) {
+  const age=p.age<=23?1.0:p.age<=27?0.85:p.age<=30?0.70:0.55;
+  return Math.min(age*0.55+Math.min(p.instagram/600000,1)*0.35+(p.captain?0.10:0),1);
+}
+function calcModelValue(p,weights) {
+  const tw=weights.performance+weights.durability+weights.scarcity+weights.nonPerf;
+  const s=calcPerformanceScore(p)*(weights.performance/tw)+calcDurabilityScore(p)*(weights.durability/tw)+
+    calcScarcityScore(p)*(weights.scarcity/tw)+calcNonPerfScore(p)*(weights.nonPerf/tw);
+  const b=POSITION_BANDS[p.position]||{min:130000,max:800000};
+  return Math.round((b.min+s*(b.max-b.min))/5000)*5000;
+}
+
+const fmt=v=>v>=1000000?`$${(v/1e6).toFixed(2)}M`:`$${(v/1000).toFixed(0)}K`;
+const cpct=v=>((v/SALARY_CAP)*100).toFixed(1)+"%";
+const getRatioColor=r=>r>=1.25?"#00e5a0":r>=1.05?"#7df2c0":r>=0.95?"#f0c040":r>=0.80?"#ff9a4a":"#ff5555";
+const getRatioLabel=r=>r>=1.25?"UNDERVALUED":r>=1.05?"FAIR+":r>=0.95?"FAIR":r>=0.80?"SLIGHT OVERPAY":"OVERPAID";
+
+const ALL_TEAMS=["All Teams",...Array.from(new Set(SEED_PLAYERS.map(p=>p.team))).sort()];
+const ALL_POSITIONS=["All Positions",...Array.from(new Set(SEED_PLAYERS.map(p=>p.position))).sort()];
+
+function InfoTooltip({category,color}){
+  const [open,setOpen]=useState(false);
+  const ref=useRef(null);
+  const info=CATEGORY_INFO[category];
+  useEffect(()=>{
+    if(!open)return;
+    const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false)};
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[open]);
+  return(
+    <div ref={ref} style={{position:"relative",display:"inline-block"}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{width:18,height:18,borderRadius:"50%",border:`1px solid ${color}66`,background:open?color+"22":"transparent",color:open?color:color+"99",fontSize:10,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",marginLeft:6,fontFamily:"serif",lineHeight:1,flexShrink:0}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=color;e.currentTarget.style.color=color;e.currentTarget.style.background=color+"22"}}
+        onMouseLeave={e=>{if(!open){e.currentTarget.style.borderColor=color+"66";e.currentTarget.style.color=color+"99";e.currentTarget.style.background="transparent"}}}>i</button>
+      {open&&(
+        <div style={{position:"absolute",top:"calc(100% + 10px)",left:"50%",transform:"translateX(-50%)",zIndex:999,width:310,background:"#0d1117",border:`1px solid ${color}44`,borderRadius:10,boxShadow:`0 8px 32px rgba(0,0,0,0.6)`,overflow:"hidden",animation:"fadeIn 0.15s ease"}}>
+          <div style={{position:"absolute",top:-5,left:"50%",width:9,height:9,background:"#0d1117",border:`1px solid ${color}44`,borderBottom:"none",borderRight:"none",transform:"translateX(-50%) rotate(45deg)"}}/>
+          <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${color}22`,background:color+"0a"}}>
+            <div style={{fontSize:11,color,letterSpacing:1.5,textTransform:"uppercase",fontWeight:500,marginBottom:4}}>{info.title}</div>
+            <div style={{fontSize:11,color:"#8892aa",lineHeight:1.5}}>{info.summary}</div>
+          </div>
+          <div style={{padding:"8px 0"}}>
+            {info.metrics.map((m,i)=>(
+              <div key={i} style={{padding:"7px 14px",borderBottom:i<info.metrics.length-1?"1px solid #1a2030":"none"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:3}}>
+                  <span style={{fontSize:11,color:"#c8d0e0",fontWeight:500}}>{m.name}</span>
+                  <span style={{fontSize:9,color,background:color+"18",border:`1px solid ${color}33`,borderRadius:10,padding:"1px 6px",letterSpacing:0.5,flexShrink:0,marginLeft:8}}>{m.weight}</span>
+                </div>
+                <div style={{fontSize:10,color:"#5a6880",lineHeight:1.5}}>{m.desc}</div>
+              </div>
+            ))}
+          </div>
+          {info.note&&<div style={{padding:"9px 14px",borderTop:`1px solid ${color}22`,background:"#0a0e16"}}>
+            <div style={{fontSize:10,color:"#4a5468",lineHeight:1.5}}><span style={{color:color+"88"}}>Note: </span>{info.note}</div>
+          </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BarMini({value,max=1,color}){
+  return <div style={{background:"#1a1f2e",borderRadius:3,height:6,width:"100%",overflow:"hidden"}}>
+    <div style={{width:`${Math.min((value/max)*100,100)}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.5s ease"}}/>
+  </div>;
+}
+
+async function fetchPlayerUpdate(playerName){
+  const prompt=`Return ONLY a valid JSON object with current 2025/2026 NRL stats for "${playerName}": {name,salary,games2024,tackleEff,missedTackles,metresPerCarry,postContact,tryAssists,linebreaks,errors,kickMetres,instagram,origin,kangaroos,captain,confidence}. JSON only.`;
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:prompt}]})});
+  const d=await r.json();
+  return JSON.parse((d?.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+}
+
+export default function NRLValuation(){
+  const [players,setPlayers]=useState(SEED_PLAYERS);
+  const [weights,setWeights]=useState({performance:0.55,durability:0.15,scarcity:0.20,nonPerf:0.10});
+  const [sortBy,setSortBy]=useState("ratio");
+  const [sortDir,setSortDir]=useState("desc");
+  const [filterTeam,setFilterTeam]=useState("All Teams");
+  const [filterPos,setFilterPos]=useState("All Positions");
+  const [search,setSearch]=useState("");
+  const [selected,setSelected]=useState(null);
+  const [tab,setTab]=useState("table");
+  const [updating,setUpdating]=useState({});
+  const [refreshAll,setRefreshAll]=useState(false);
+  const [refreshProg,setRefreshProg]=useState(0);
+  const [showOnlyOverpaid,setShowOnlyOverpaid]=useState(false);
+  const [showOnlyUndervalued,setShowOnlyUndervalued]=useState(false);
+
+  const enriched=useMemo(()=>players.map(p=>{
+    const modelValue=calcModelValue(p,weights);
+    return{...p,modelValue,ratio:modelValue/p.salary,delta:modelValue-p.salary,
+      perfScore:calcPerformanceScore(p),durScore:calcDurabilityScore(p),
+      scarScore:calcScarcityScore(p),nonPScore:calcNonPerfScore(p)};
+  }),[players,weights]);
+
+  const filtered=useMemo(()=>{
+    let r=enriched
+      .filter(p=>filterTeam==="All Teams"||p.team===filterTeam)
+      .filter(p=>filterPos==="All Positions"||p.position===filterPos)
+      .filter(p=>!search||p.name.toLowerCase().includes(search.toLowerCase()))
+      .filter(p=>!showOnlyOverpaid||p.ratio<0.95)
+      .filter(p=>!showOnlyUndervalued||p.ratio>=1.10);
+    return r.sort((a,b)=>{
+      const v=sortDir==="desc"?-1:1;
+      if(sortBy==="name")return v*a.name.localeCompare(b.name);
+      if(sortBy==="salary")return v*(a.salary-b.salary);
+      if(sortBy==="modelValue")return v*(a.modelValue-b.modelValue);
+      if(sortBy==="ratio")return v*(a.ratio-b.ratio);
+      if(sortBy==="delta")return v*(a.delta-b.delta);
+      return 0;
+    });
+  },[enriched,filterTeam,filterPos,search,sortBy,sortDir,showOnlyOverpaid,showOnlyUndervalued]);
+
+  const selectedPlayer=selected?enriched.find(p=>p.name===selected):null;
+  const totalW=Object.values(weights).reduce((a,b)=>a+b,0);
+
+  function toggleSort(col){if(sortBy===col)setSortDir(d=>d==="desc"?"asc":"desc");else{setSortBy(col);setSortDir("desc");}}
+  function adjustWeight(key,d){setWeights(prev=>({...prev,[key]:Math.max(0.05,Math.min(0.80,prev[key]+d))}));}
+
+  async function updatePlayer(name){
+    setUpdating(u=>({...u,[name]:"loading"}));
+    try{const patch=await fetchPlayerUpdate(name);setPlayers(prev=>prev.map(p=>p.name===name?{...p,...patch,_updated:true,_confidence:patch.confidence}:p));setUpdating(u=>({...u,[name]:"done"}));}
+    catch{setUpdating(u=>({...u,[name]:"error"}));}
+  }
+  async function refreshAllPlayers(){
+    setRefreshAll(true);setRefreshProg(0);
+    for(let i=0;i<players.length;i++){await updatePlayer(players[i].name);setRefreshProg(Math.round(((i+1)/players.length)*100));}
+    setRefreshAll(false);
+  }
+
+  const WCONF=[
+    {key:"performance",label:"On-Field Performance",color:"#00e5a0"},
+    {key:"durability", label:"Durability",           color:"#4a9eff"},
+    {key:"scarcity",   label:"Positional Scarcity",  color:"#f0c040"},
+    {key:"nonPerf",    label:"Non-Performance",       color:"#ff7eb3"},
+  ];
+
+  const teamCapUsage=useMemo(()=>{
+    const m={};
+    for(const t of ALL_TEAMS.slice(1)){
+      const tp=enriched.filter(p=>p.team===t);
+      const actual=tp.reduce((s,p)=>s+p.salary,0);
+      const model=tp.reduce((s,p)=>s+p.modelValue,0);
+      m[t]={actual,model,players:tp.length};
+    }
+    return m;
+  },[enriched]);
+
+  return(
+    <div style={{fontFamily:"'DM Mono','Courier New',monospace",background:"#0d1117",minHeight:"100vh",color:"#e8eaf0",paddingBottom:60}}>
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap');
+      *{box-sizing:border-box;}
+      ::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:#0d1117;}::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px;}
+      .rh:hover{background:#151c28!important;cursor:pointer;}
+      .th:hover{color:#00e5a0;cursor:pointer;}
+      .tab-btn{background:none;border:none;font-family:inherit;cursor:pointer;padding:9px 18px;font-size:11px;letter-spacing:2px;text-transform:uppercase;transition:all 0.2s;}
+      .wb{background:#1a1f2e;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:13px;cursor:pointer;width:26px;height:26px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;}
+      .wb:hover{border-color:#00e5a0;color:#00e5a0;}
+      select,input{background:#1a1f2e;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:11px;padding:6px 10px;border-radius:6px;letter-spacing:1px;}
+      select:focus,input:focus{outline:none;border-color:#00e5a0;}
+      input::placeholder{color:#3a4560;}
+      .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;letter-spacing:1.5px;font-weight:500;}
+      .ub{background:#1a1f2e;border:1px solid #2a3040;color:#5a6380;font-family:inherit;font-size:10px;cursor:pointer;padding:3px 8px;border-radius:4px;transition:all 0.2s;}
+      .ub:hover{border-color:#4a9eff;color:#4a9eff;}
+      .ra{background:#0d1117;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:11px;cursor:pointer;padding:8px 16px;border-radius:8px;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;}
+      .ra:hover:not(:disabled){border-color:#00e5a0;color:#00e5a0;}
+      .ra:disabled{opacity:0.4;cursor:not-allowed;}
+      .close-btn{background:none;border:1px solid #2a3040;color:#888;font-family:inherit;font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;transition:all 0.2s;}
+      .close-btn:hover{border-color:#555;color:#e8eaf0;}
+      .fchk{background:none;border:1px solid #2a3040;color:#5a6380;font-family:inherit;font-size:10px;cursor:pointer;padding:5px 12px;border-radius:6px;letter-spacing:1px;transition:all 0.2s;white-space:nowrap;}
+      .fchk.active{border-color:#00e5a044;background:#00e5a011;color:#00e5a0;}
+      .fchk.active-red{border-color:#ff555544;background:#ff555511;color:#ff5555;}
+      @keyframes spin{to{transform:rotate(360deg)}} .spin{animation:spin 1s linear infinite;display:inline-block;}
+      @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+    `}</style>
+
+    {/* HEADER */}
+    <div style={{background:"linear-gradient(135deg,#0d1117 0%,#111827 100%)",borderBottom:"1px solid #1e2535",padding:"28px 28px 20px"}}>
+      <div style={{maxWidth:1200,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"flex-end",gap:14,marginBottom:6,flexWrap:"wrap"}}>
+          {["NRL","VALUATION","ENGINE"].map((w,i)=>(
+            <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
+          ))}
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V4 · ALL CLUBS</span>
+        </div>
+        <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
+          {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
+        </div>
+      </div>
+    </div>
+
+    <div style={{maxWidth:1200,margin:"0 auto",padding:"0 24px"}}>
+
+      {/* WEIGHTS */}
+      <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,padding:"18px 22px",marginTop:20,marginBottom:14}}>
+        <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
+          Model Weights — click <span style={{fontFamily:"serif",fontStyle:"italic"}}>i</span> for methodology
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:18}}>
+          {WCONF.map(({key,label,color})=>(
+            <div key={key}>
+              <div style={{display:"flex",alignItems:"center",marginBottom:9}}>
+                <div style={{fontSize:10,color:"#888",letterSpacing:1,textTransform:"uppercase",lineHeight:1.3}}>{label}</div>
+                <InfoTooltip category={key} color={color}/>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <button className="wb" onClick={()=>adjustWeight(key,-0.05)}>−</button>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color,letterSpacing:2,minWidth:50,textAlign:"center"}}>
+                  {Math.round((weights[key]/totalW)*100)}%
+                </div>
+                <button className="wb" onClick={()=>adjustWeight(key,+0.05)}>+</button>
+              </div>
+              <BarMini value={weights[key]} max={0.8} color={color}/>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* FILTERS ROW */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:14}}>
+        <input placeholder="Search player..." value={search} onChange={e=>setSearch(e.target.value)} style={{width:180,cursor:"text"}}/>
+        <select value={filterTeam} onChange={e=>setFilterTeam(e.target.value)}>
+          {ALL_TEAMS.map(t=><option key={t}>{t}</option>)}
+        </select>
+        <select value={filterPos} onChange={e=>setFilterPos(e.target.value)}>
+          {ALL_POSITIONS.map(p=><option key={p}>{p}</option>)}
+        </select>
+        <button className={`fchk${showOnlyUndervalued?" active":""}`} onClick={()=>{setShowOnlyUndervalued(v=>!v);setShowOnlyOverpaid(false);}}>
+          ↑ Undervalued only
+        </button>
+        <button className={`fchk${showOnlyOverpaid?" active-red":""}`} onClick={()=>{setShowOnlyOverpaid(v=>!v);setShowOnlyUndervalued(false);}}>
+          ↓ Overpaid only
+        </button>
+        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+          <div style={{display:"flex",background:"#111623",border:"1px solid #1e2535",borderRadius:8,overflow:"hidden"}}>
+            {["table","chart","teams"].map(t=>(
+              <button key={t} className="tab-btn" onClick={()=>setTab(t)}
+                style={{color:tab===t?"#00e5a0":"#5a6380",borderBottom:tab===t?"2px solid #00e5a0":"2px solid transparent"}}>
+                {t==="table"?"Players":t==="chart"?"Chart":"Teams"}
+              </button>
+            ))}
+          </div>
+          <button className="ra" disabled={refreshAll} onClick={refreshAllPlayers} style={{fontSize:10}}>
+            {refreshAll?<><span className="spin">↻</span> {refreshProg}%</>:"↻ Refresh All"}
+          </button>
+        </div>
+      </div>
+
+      {refreshAll&&<div style={{background:"#0d1117",borderRadius:4,height:3,overflow:"hidden",marginBottom:12}}>
+        <div style={{width:`${refreshProg}%`,height:"100%",background:"#00e5a0",transition:"width 0.3s ease"}}/>
+      </div>}
+
+      {/* SUMMARY PILLS */}
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        {[
+          {label:`${filtered.filter(p=>p.ratio>=1.10).length} undervalued`,color:"#00e5a0"},
+          {label:`${filtered.filter(p=>p.ratio>=0.95&&p.ratio<1.10).length} fair value`,color:"#f0c040"},
+          {label:`${filtered.filter(p=>p.ratio<0.95).length} overpaid`,color:"#ff5555"},
+          {label:`${filtered.length} players shown`,color:"#4a9eff"},
+        ].map(({label,color})=>(
+          <div key={label} style={{background:color+"14",border:`1px solid ${color}33`,borderRadius:20,padding:"4px 12px",fontSize:11,color,letterSpacing:1}}>{label}</div>
+        ))}
+      </div>
+
+      {/* TABLE */}
+      {tab==="table"&&(
+        <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,overflow:"hidden"}}>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead>
+                <tr style={{borderBottom:"1px solid #1e2535",background:"#0d1117"}}>
+                  {[["name","Player"],["pos","Pos"],["team","Team"],["salary","Salary"],["modelValue","Model Value"],["delta","Delta"],["ratio","Value Ratio"],["live",""]].map(([key,lbl])=>(
+                    <th key={key} className={key!=="pos"&&key!=="team"&&key!=="live"?"th":undefined}
+                      onClick={()=>key!=="pos"&&key!=="team"&&key!=="live"&&toggleSort(key)}
+                      style={{padding:"11px 12px",textAlign:key==="name"?"left":"right",color:"#5a6380",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",whiteSpace:"nowrap",cursor:["pos","team","live"].includes(key)?"default":"pointer"}}>
+                      {lbl}{!["pos","team","live"].includes(key)&&(
+                        sortBy===key?<span style={{marginLeft:4,color:"#00e5a0"}}>{sortDir==="desc"?"↓":"↑"}</span>:<span style={{opacity:0.3,marginLeft:4}}>↕</span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p,i)=>(
+                  <tr key={p.name} className="rh" onClick={()=>setSelected(selected===p.name?null:p.name)}
+                    style={{borderBottom:"1px solid #151d28",background:selected===p.name?"#151c28":i%2===0?"#111623":"#0f1520"}}>
+                    <td style={{padding:"10px 12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontWeight:500,color:"#e8eaf0"}}>{p.name}</span>
+                        {p._updated&&<span className="pill" style={{background:"#00e5a022",color:"#00e5a0",border:"1px solid #00e5a044"}}>LIVE</span>}
+                      </div>
+                      <div style={{fontSize:10,color:"#5a6380",marginTop:2}}>
+                        {p.origin&&<span style={{color:"#4a9eff",marginRight:5}}>◆ SOO</span>}
+                        {p.kangaroos&&<span style={{color:"#f0c040",marginRight:5}}>★ ROOS</span>}
+                        {p.captain&&<span style={{color:"#ff7eb3"}}>© CAP</span>}
+                      </div>
+                    </td>
+                    <td style={{padding:"10px 12px",textAlign:"right",color:"#8892aa",fontSize:11,whiteSpace:"nowrap"}}>{p.position}</td>
+                    <td style={{padding:"10px 12px",textAlign:"right",color:"#5a6380",fontSize:10,whiteSpace:"nowrap"}}>{p.team}</td>
+                    <td style={{padding:"10px 12px",textAlign:"right"}}>
+                      <div style={{color:"#e8eaf0"}}>{fmt(p.salary)}</div>
+                      <div style={{fontSize:10,color:"#5a6380"}}>{cpct(p.salary)}</div>
+                    </td>
+                    <td style={{padding:"10px 12px",textAlign:"right"}}>
+                      <div style={{color:"#00e5a0"}}>{fmt(p.modelValue)}</div>
+                      <div style={{fontSize:10,color:"#5a6380"}}>{cpct(p.modelValue)}</div>
+                    </td>
+                    <td style={{padding:"10px 12px",textAlign:"right"}}>
+                      <span style={{color:p.delta>=0?"#00e5a0":"#ff5555",fontWeight:500}}>{p.delta>=0?"+":""}{fmt(p.delta)}</span>
+                    </td>
+                    <td style={{padding:"10px 12px",textAlign:"right"}}>
+                      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:19,color:getRatioColor(p.ratio),letterSpacing:1}}>{p.ratio.toFixed(2)}x</span>
+                        <span className="pill" style={{background:getRatioColor(p.ratio)+"22",color:getRatioColor(p.ratio),border:`1px solid ${getRatioColor(p.ratio)}44`}}>{getRatioLabel(p.ratio)}</span>
+                      </div>
+                    </td>
+                    <td style={{padding:"10px 12px",textAlign:"right"}}>
+                      <button className="ub" disabled={updating[p.name]==="loading"||refreshAll}
+                        onClick={e=>{e.stopPropagation();updatePlayer(p.name);}}>
+                        {updating[p.name]==="loading"?<span className="spin">↻</span>:"↻"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* CHART */}
+      {tab==="chart"&&(
+        <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,padding:"22px"}}>
+          <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:18}}>
+            Model Value vs. Actual Salary — {filtered.length} players sorted by value ratio
+          </div>
+          <div style={{maxHeight:600,overflowY:"auto",paddingRight:8}}>
+            {[...filtered].sort((a,b)=>b.ratio-a.ratio).map(p=>{
+              const maxVal=Math.max(...filtered.map(x=>Math.max(x.salary,x.modelValue)));
+              return(
+                <div key={p.name} style={{marginBottom:14,cursor:"pointer"}} onClick={()=>setSelected(selected===p.name?null:p.name)}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
+                    <div>
+                      <span style={{fontSize:12,color:selected===p.name?"#00e5a0":"#e8eaf0"}}>{p.name}</span>
+                      <span style={{fontSize:10,color:"#5a6380",marginLeft:8}}>{p.position} · {p.team}</span>
+                    </div>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:getRatioColor(p.ratio),letterSpacing:1}}>{p.ratio.toFixed(2)}x</span>
+                  </div>
+                  {[["Actual",p.salary,"#3a4560"],["Model",p.modelValue,getRatioColor(p.ratio)]].map(([l,v,c])=>(
+                    <div key={l} style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                      <div style={{width:48,fontSize:10,color:l==="Model"?"#00e5a0":"#5a6380",textAlign:"right",flexShrink:0}}>{l}</div>
+                      <div style={{flex:1,background:"#1a1f2e",borderRadius:3,height:7,overflow:"hidden"}}>
+                        <div style={{width:`${(v/maxVal)*100}%`,height:"100%",background:c,borderRadius:3,transition:"width 0.5s ease"}}/>
+                      </div>
+                      <div style={{width:62,fontSize:10,color:l==="Model"?c:"#8892aa",flexShrink:0}}>{fmt(v)}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TEAMS VIEW */}
+      {tab==="teams"&&(
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+          {ALL_TEAMS.slice(1).map(team=>{
+            const td=teamCapUsage[team];
+            const tp=enriched.filter(p=>p.team===team).sort((a,b)=>b.ratio-a.ratio);
+            const undervalued=tp.filter(p=>p.ratio>=1.10).length;
+            const overpaid=tp.filter(p=>p.ratio<0.95).length;
+            const capEfficiency=(td.model/td.actual);
+            return(
+              <div key={team} style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,padding:"16px 18px",cursor:"pointer"}}
+                onClick={()=>{setFilterTeam(team);setTab("table");}}>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#e8eaf0",letterSpacing:2,marginBottom:6,lineHeight:1.2}}>{team}</div>
+                <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,color:"#00e5a0",background:"#00e5a014",padding:"2px 8px",borderRadius:10}}>{undervalued} undervalued</span>
+                  <span style={{fontSize:10,color:"#ff5555",background:"#ff555514",padding:"2px 8px",borderRadius:10}}>{overpaid} overpaid</span>
+                </div>
+                <div style={{fontSize:10,color:"#5a6380",marginBottom:6}}>
+                  Cap: {fmt(td.actual)} actual vs {fmt(td.model)} model
+                </div>
+                <div style={{background:"#0d1117",borderRadius:4,height:5,overflow:"hidden",marginBottom:10}}>
+                  <div style={{width:`${Math.min((td.actual/SALARY_CAP)*100,100)}%`,height:"100%",background:capEfficiency>=1?"#00e5a0":"#ff9a4a"}}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  {tp.slice(0,3).map(p=>(
+                    <div key={p.name} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:10,color:"#8892aa"}}>{p.name}</span>
+                      <span style={{fontSize:10,color:getRatioColor(p.ratio),fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>{p.ratio.toFixed(2)}x</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* PLAYER DETAIL */}
+      {selectedPlayer&&(
+        <div style={{background:"#111623",border:`1px solid ${getRatioColor(selectedPlayer.ratio)}44`,borderRadius:12,padding:"22px",marginTop:16,position:"relative"}}>
+          <button className="close-btn" onClick={()=>setSelected(null)} style={{position:"absolute",top:18,right:18}}>✕</button>
+          <div style={{display:"flex",alignItems:"flex-start",gap:20,marginBottom:18,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,letterSpacing:3,color:"#e8eaf0"}}>
+                {selectedPlayer.name}
+                {selectedPlayer._updated&&<span className="pill" style={{marginLeft:10,background:"#00e5a022",color:"#00e5a0",border:"1px solid #00e5a044"}}>LIVE</span>}
+              </div>
+              <div style={{fontSize:11,color:"#5a6380",letterSpacing:1,marginBottom:8}}>{selectedPlayer.position} · {selectedPlayer.team} · Age {selectedPlayer.age}</div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                {selectedPlayer.origin&&<span className="pill" style={{background:"#4a9eff22",color:"#4a9eff",border:"1px solid #4a9eff44"}}>SOO</span>}
+                {selectedPlayer.kangaroos&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Kangaroos</span>}
+                {selectedPlayer.captain&&<span className="pill" style={{background:"#ff7eb322",color:"#ff7eb3",border:"1px solid #ff7eb344"}}>Captain</span>}
+              </div>
+            </div>
+            <div style={{marginLeft:"auto",textAlign:"right"}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:46,color:getRatioColor(selectedPlayer.ratio),letterSpacing:2,lineHeight:1}}>{selectedPlayer.ratio.toFixed(2)}x</div>
+              <div style={{fontSize:11,color:getRatioColor(selectedPlayer.ratio),letterSpacing:2}}>{getRatioLabel(selectedPlayer.ratio)}</div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
+            {[
+              {label:"Actual Salary",value:fmt(selectedPlayer.salary),sub:cpct(selectedPlayer.salary)+" of cap",color:"#8892aa"},
+              {label:"Model Value",value:fmt(selectedPlayer.modelValue),sub:cpct(selectedPlayer.modelValue)+" of cap",color:"#00e5a0"},
+              {label:"Delta",value:(selectedPlayer.delta>=0?"+":"")+fmt(selectedPlayer.delta),sub:selectedPlayer.delta>=0?"Undervalued":"Overpaid",color:selectedPlayer.delta>=0?"#00e5a0":"#ff5555"},
+            ].map(({label,value,sub,color})=>(
+              <div key={label} style={{background:"#0d1117",borderRadius:8,padding:"14px 16px",border:"1px solid #1e2535"}}>
+                <div style={{fontSize:10,color:"#5a6380",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{label}</div>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color,letterSpacing:2}}>{value}</div>
+                <div style={{fontSize:10,color:"#5a6380",marginTop:2}}>{sub}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+            {[
+              {key:"perfScore",catKey:"performance",color:"#00e5a0",metrics:[["Tackle Eff",selectedPlayer.tackleEff+"%"],["Missed Tackles/G",selectedPlayer.missedTackles],["m/Carry",selectedPlayer.metresPerCarry+"m"],["Try Assists",selectedPlayer.tryAssists],["Linebreaks",selectedPlayer.linebreaks],["Errors/G",selectedPlayer.errors]]},
+              {key:"durScore",catKey:"durability",color:"#4a9eff",metrics:[["2024",selectedPlayer.games2024+"/27"],["2023",selectedPlayer.games2023+"/27"],["2022",selectedPlayer.games2022+"/24"],["3yr Avg",((selectedPlayer.games2024+selectedPlayer.games2023+selectedPlayer.games2022)/3).toFixed(1)]]},
+              {key:"scarScore",catKey:"scarcity",color:"#f0c040",metrics:[["Position",selectedPlayer.position],["Base Rate",Math.round((POSITION_BANDS[selectedPlayer.position]?.scarcity||0.75)*100)+"%"],["SOO Bonus",selectedPlayer.origin?"+8%":"—"],["ROOS Bonus",selectedPlayer.kangaroos?"+6%":"—"]]},
+              {key:"nonPScore",catKey:"nonPerf",color:"#ff7eb3",metrics:[["Age",selectedPlayer.age+" yrs"],["Instagram",selectedPlayer.instagram.toLocaleString()],["Captain",selectedPlayer.captain?"Yes":"No"]]},
+            ].map(({key,catKey,color,metrics})=>(
+              <div key={key} style={{background:"#0d1117",borderRadius:8,padding:"14px 16px",border:`1px solid ${color}22`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center"}}>
+                    <div style={{fontSize:10,color,letterSpacing:1.5,textTransform:"uppercase"}}>{CATEGORY_INFO[catKey].title}</div>
+                    <InfoTooltip category={catKey} color={color}/>
+                  </div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color,letterSpacing:1}}>{Math.round(selectedPlayer[key]*100)}</div>
+                </div>
+                <BarMini value={selectedPlayer[key]} max={1} color={color}/>
+                <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
+                  {metrics.map(([l,v])=>(
+                    <div key={l} style={{display:"flex",justifyContent:"space-between"}}>
+                      <span style={{fontSize:11,color:"#5a6380"}}>{l}</span>
+                      <span style={{fontSize:11,color:"#8892aa"}}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
+        METHODOLOGY v4: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+      </div>
+    </div>
+    </div>
+  );
+}
