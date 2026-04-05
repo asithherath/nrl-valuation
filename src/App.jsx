@@ -41,7 +41,7 @@ const CATEGORY_INFO = {
     metrics: [
       { name: "Position Base Rate",  weight: "Main", desc: "How scarce elite players at this position are across all 17 clubs. Halfbacks (0.95) are rarer than wingers (0.68)." },
       { name: "State of Origin",     weight: "+8%",  desc: "Selected for NSW or QLD in the last 2 years — top-26 positional quality nationally." },
-      { name: "Kangaroos Selection", weight: "+6%",  desc: "Selected for Australia — top-tier international recognition." },
+      { name: "Intl Rep", weight: "+6%",  desc: "Represented any nation internationally in 2024/25 (Australia, NZ, Samoa, Tonga, Fiji, PNG, Cook Islands, England)." },
     ],
     note: "Scarcity lifts the positional band floor. A rep halfback is valued higher than a club-only halfback with identical stats.",
   },
@@ -52,17 +52,17 @@ const CATEGORY_INFO = {
       { name: "Social Media Reach",  weight: "35%",  desc: "Instagram followers as a proxy for commercial marketability — jersey sales, sponsor activations, media value." },
       { name: "Club Captain",        weight: "+10%", desc: "Captains provide leadership and media presence beyond what shows up in the stats." },
     ],
-    note: "Lowest default weight (10%) but adjustable — agents would weight it higher, club analysts lower.",
+    note: "Lowest default weight (8%) but adjustable — agents would weight it higher, club analysts lower.",
   },
   contract: {
-    title: "Contract Security", summary: "How many years remain on the player's current deal?",
+    title: "Contract Security", summary: "Years remaining on the player's current deal affects transfer value.",
     metrics: [
-      { name: "0 years (off-contract)", weight: "0.0×", desc: "Off-contract at end of 2026. High uncertainty — player is free to move, no transfer value for the club." },
-      { name: "1 year remaining",       weight: "0.5×", desc: "One additional season locked in. Some security but still entering the market next off-season." },
-      { name: "2 years remaining",      weight: "0.75×", desc: "Solid mid-term security. Club retains leverage and the player is a known quantity." },
-      { name: "3+ years remaining",     weight: "1.0×", desc: "Long-term deal. Maximum transfer value — the club controls the player's future." },
+      { name: "0 years (off-contract)", weight: "0.0×", desc: "Off-contract end of 2026 — no transfer value, free to move." },
+      { name: "1 year remaining",       weight: "0.5×", desc: "Final year — some security but hitting the market next off-season." },
+      { name: "2 years remaining",      weight: "0.75×", desc: "Mid-term security. Club retains leverage." },
+      { name: "3+ years remaining",     weight: "1.0×", desc: "Long-term deal — maximum transfer value." },
     ],
-    note: "Contract length affects market value independently of performance. A star off-contract is worth less on paper than the same star with 3 years left.",
+    note: "A star player off-contract is worth less on paper than the same player locked in for 3 years.",
   },
 };
 
@@ -538,17 +538,25 @@ function calcDurabilityScore(p) {
   return Math.min(((p.games2024+p.games2023+p.games2022)/3)/24,1);
 }
 function calcScarcityScore(p) {
-  const base=(POSITION_BANDS[p.position]?.scarcity)||0.75;
-  return Math.min(base+(p.origin?0.08:0)+(p.kangaroos?0.06:0),1);
+  const base=(POSITION_BANDS[p.position]?POSITION_BANDS[p.position].scarcity:0.75)||0.75;
+  return Math.min(base+(p.origin?0.08:0)+(p.intl?0.06:0),1);
 }
 function calcNonPerfScore(p) {
   const age=p.age<=23?1.0:p.age<=27?0.85:p.age<=30?0.70:0.55;
   return Math.min(age*0.55+Math.min(p.instagram/600000,1)*0.35+(p.captain?0.10:0),1);
 }
+function calcContractScore(p) {
+  const cy = (typeof p.contractYears === "number") ? p.contractYears : 1;
+  if(cy <= 0) return 0.0;
+  if(cy === 1) return 0.5;
+  if(cy === 2) return 0.75;
+  return 1.0;
+}
 function calcModelValue(p,weights) {
-  const tw=weights.performance+weights.durability+weights.scarcity+weights.nonPerf;
+  const tw=weights.performance+weights.durability+weights.scarcity+weights.nonPerf+(weights.contract||0);
   const s=calcPerformanceScore(p)*(weights.performance/tw)+calcDurabilityScore(p)*(weights.durability/tw)+
-    calcScarcityScore(p)*(weights.scarcity/tw)+calcNonPerfScore(p)*(weights.nonPerf/tw);
+    calcScarcityScore(p)*(weights.scarcity/tw)+calcNonPerfScore(p)*(weights.nonPerf/tw)+
+    calcContractScore(p)*((weights.contract||0)/tw);
   const b=POSITION_BANDS[p.position]||{min:130000,max:800000};
   return Math.round((b.min+s*(b.max-b.min))/5000)*5000;
 }
@@ -610,10 +618,10 @@ function BarMini({value,max=1,color}){
 }
 
 async function fetchPlayerUpdate(playerName){
-  const prompt=`Return ONLY a valid JSON object with current 2025/2026 NRL stats for "${playerName}": {name,salary,games2024,tackleEff,missedTackles,metresPerCarry,postContact,tryAssists,linebreaks,errors,kickMetres,instagram,origin,kangaroos,captain,confidence}. JSON only.`;
+  const prompt=`Return ONLY a valid JSON object with current 2025/2026 NRL stats for "${playerName}": {name,salary,games2024,tackleEff,missedTackles,metresPerCarry,postContact,tryAssists,linebreaks,errors,kickMetres,instagram,origin,intl,captain,contractYears,confidence}. JSON only.`;
   const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:prompt}]})});
   const d=await r.json();
-  return JSON.parse((d?.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+  return JSON.parse(((d&&d.content&&d.content[0]&&d.content[0].text)||"{}").replace(/```json|```/g,"").trim());
 }
 
 export default function NRLValuation(){
@@ -729,7 +737,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V11 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V12 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -744,7 +752,7 @@ export default function NRLValuation(){
         <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
           Model Weights — click <span style={{fontFamily:"serif",fontStyle:"italic"}}>i</span> for methodology
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:18}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:18}}>
           {WCONF.map(({key,label,color})=>(
             <div key={key}>
               <div style={{display:"flex",alignItems:"center",marginBottom:9}}>
@@ -839,7 +847,7 @@ export default function NRLValuation(){
                       </div>
                       <div style={{fontSize:10,color:"#5a6380",marginTop:2}}>
                         {p.origin&&<span style={{color:"#4a9eff",marginRight:5}}>◆ SOO</span>}
-                        {p.kangaroos&&<span style={{color:"#f0c040",marginRight:5}}>★ ROOS</span>}
+                        {p.intl&&<span style={{color:"#f0c040",marginRight:5}}>★ INTL</span>}
                         {p.captain&&<span style={{color:"#ff7eb3"}}>© CAP</span>}
                       </div>
                     </td>
@@ -960,7 +968,7 @@ export default function NRLValuation(){
               <div style={{fontSize:11,color:"#5a6380",letterSpacing:1,marginBottom:8}}>{selectedPlayer.position} · {selectedPlayer.team} · Age {selectedPlayer.age}</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {selectedPlayer.origin&&<span className="pill" style={{background:"#4a9eff22",color:"#4a9eff",border:"1px solid #4a9eff44"}}>SOO</span>}
-                {selectedPlayer.kangaroos&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Kangaroos</span>}
+                {selectedPlayer.intl&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Intl Rep</span>}
                 {selectedPlayer.captain&&<span className="pill" style={{background:"#ff7eb322",color:"#ff7eb3",border:"1px solid #ff7eb344"}}>Captain</span>}
               </div>
             </div>
@@ -982,13 +990,13 @@ export default function NRLValuation(){
               </div>
             ))}
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,gridTemplateRows:"auto auto auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
             {[
               {key:"perfScore",catKey:"performance",color:"#00e5a0",metrics:[["Tackle Eff",selectedPlayer.tackleEff+"%"],["Missed Tackles/G",selectedPlayer.missedTackles],["m/Carry",selectedPlayer.metresPerCarry+"m"],["Try Assists",selectedPlayer.tryAssists],["Linebreaks",selectedPlayer.linebreaks],["Errors/G",selectedPlayer.errors]]},
               {key:"durScore",catKey:"durability",color:"#4a9eff",metrics:[["2024",selectedPlayer.games2024+"/27"],["2023",selectedPlayer.games2023+"/27"],["2022",selectedPlayer.games2022+"/24"],["3yr Avg",((selectedPlayer.games2024+selectedPlayer.games2023+selectedPlayer.games2022)/3).toFixed(1)]]},
-              {key:"scarScore",catKey:"scarcity",color:"#f0c040",metrics:[["Position",selectedPlayer.position],["Base Rate",Math.round((POSITION_BANDS[selectedPlayer.position]?.scarcity||0.75)*100)+"%"],["SOO Bonus",selectedPlayer.origin?"+8%":"—"],["ROOS Bonus",selectedPlayer.kangaroos?"+6%":"—"]]},
+              {key:"scarScore",catKey:"scarcity",color:"#f0c040",metrics:[["Position",selectedPlayer.position],["Base Rate",Math.round(((POSITION_BANDS[selectedPlayer.position]&&POSITION_BANDS[selectedPlayer.position].scarcity)||0.75)*100)+"%"],["SOO Bonus",selectedPlayer.origin?"+8%":"—"],["Intl Bonus",selectedPlayer.intl?"+6%":"—"]]},
               {key:"nonPScore",catKey:"nonPerf",color:"#ff7eb3",metrics:[["Age",selectedPlayer.age+" yrs"],["Instagram",selectedPlayer.instagram.toLocaleString()],["Captain",selectedPlayer.captain?"Yes":"No"]]},
-              {key:"contractScore",catKey:"contract",color:"#a78bfa",metrics:[["Years Remaining",selectedPlayer.contractYears??1],["Status",(selectedPlayer.contractYears??1)===0?"Off-contract":(selectedPlayer.contractYears??1)===1?"Final year":(selectedPlayer.contractYears??1)===2?"2 yrs secured":"Long-term deal"]]},
+              {key:"contractScore",catKey:"contract",color:"#a78bfa",metrics:[["Years Remaining",(selectedPlayer.contractYears||0)],["Status",(selectedPlayer.contractYears||0)===0?"Off-contract":(selectedPlayer.contractYears||0)===1?"Final year":(selectedPlayer.contractYears||0)===2?"2 yrs secured":"Long-term"]]},
             ].map(({key,catKey,color,metrics})=>(
               <div key={key} style={{background:"#0d1117",borderRadius:8,padding:"14px 16px",border:`1px solid ${color}22`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -1014,7 +1022,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v11: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Five weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v12: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
