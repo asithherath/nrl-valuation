@@ -737,7 +737,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V12 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V13 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -992,7 +992,7 @@ export default function NRLValuation(){
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
             {[
-              {key:"perfScore",catKey:"performance",color:"#00e5a0",metrics:[["Tackle Eff",selectedPlayer.tackleEff+"%"],["Missed Tackles/G",selectedPlayer.missedTackles],["m/Carry",selectedPlayer.metresPerCarry+"m"],["Try Assists",selectedPlayer.tryAssists],["Linebreaks",selectedPlayer.linebreaks],["Errors/G",selectedPlayer.errors]]},
+              {key:"perfScore",catKey:"performance",color:"#00e5a0",metrics:[["Tackle Eff",selectedPlayer.tackleEff+"%"],["Missed Tackles/G",selectedPlayer.missedTackles],["m/Carry",selectedPlayer.metresPerCarry+"m"],["Post-Contact m",selectedPlayer.postContact+"m"],["Try Assists",selectedPlayer.tryAssists],["Linebreaks",selectedPlayer.linebreaks],["Errors/G",selectedPlayer.errors]]},
               {key:"durScore",catKey:"durability",color:"#4a9eff",metrics:[["2024",selectedPlayer.games2024+"/27"],["2023",selectedPlayer.games2023+"/27"],["2022",selectedPlayer.games2022+"/24"],["3yr Avg",((selectedPlayer.games2024+selectedPlayer.games2023+selectedPlayer.games2022)/3).toFixed(1)]]},
               {key:"scarScore",catKey:"scarcity",color:"#f0c040",metrics:[["Position",selectedPlayer.position],["Base Rate",Math.round(((POSITION_BANDS[selectedPlayer.position]&&POSITION_BANDS[selectedPlayer.position].scarcity)||0.75)*100)+"%"],["SOO Bonus",selectedPlayer.origin?"+8%":"—"],["Intl Bonus",selectedPlayer.intl?"+6%":"—"]]},
               {key:"nonPScore",catKey:"nonPerf",color:"#ff7eb3",metrics:[["Age",selectedPlayer.age+" yrs"],["Instagram",selectedPlayer.instagram.toLocaleString()],["Captain",selectedPlayer.captain?"Yes":"No"]]},
@@ -1022,7 +1022,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v12: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v13: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
