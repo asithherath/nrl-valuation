@@ -653,6 +653,8 @@ export default function NRLValuation(){
   const [refreshProg,setRefreshProg]=useState(0);
   const [showOnlyOverpaid,setShowOnlyOverpaid]=useState(false);
   const [showOnlyUndervalued,setShowOnlyUndervalued]=useState(false);
+  const [compareA,setCompareA]=useState(null);
+  const [compareB,setCompareB]=useState(null);
 
   const enriched=useMemo(()=>players.map(p=>{
     const modelValue=calcModelValue(p,weights);
@@ -751,7 +753,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V16 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V17 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -803,10 +805,10 @@ export default function NRLValuation(){
         </button>
         <div style={{marginLeft:"auto",display:"flex",gap:6}}>
           <div style={{display:"flex",background:"#111623",border:"1px solid #1e2535",borderRadius:8,overflow:"hidden"}}>
-            {["table","chart","teams"].map(t=>(
+            {["table","chart","teams","compare"].map(t=>(
               <button key={t} className="tab-btn" onClick={()=>setTab(t)}
                 style={{color:tab===t?"#00e5a0":"#5a6380",borderBottom:tab===t?"2px solid #00e5a0":"2px solid transparent"}}>
-                {t==="table"?"Players":t==="chart"?"Chart":"Teams"}
+                {t==="table"?"Players":t==="chart"?"Chart":t==="teams"?"Teams":"Compare"}
               </button>
             ))}
           </div>
@@ -1035,8 +1037,170 @@ export default function NRLValuation(){
         </div>
       )}
 
+
+      {/* COMPARE TAB */}
+      {tab==="compare"&&(
+        <div>
+          {/* Player picker row */}
+          <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+            {[{label:"Player A",color:"#00e5a0",val:compareA,set:setCompareA},{label:"Player B",color:"#4a9eff",val:compareB,set:setCompareB}].map(({label,color,val,set})=>(
+              <div key={label} style={{flex:1,minWidth:260,background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,color,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>{label}</div>
+                <select value={val||""} onChange={e=>set(e.target.value||null)}
+                  style={{width:"100%",background:"#0d1117",border:`1px solid ${color}44`,color:"#e8eaf0",fontFamily:"inherit",fontSize:12,padding:"8px 10px",borderRadius:6,cursor:"pointer"}}>
+                  <option value="">— Select a player —</option>
+                  {[...enriched].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>(
+                    <option key={p.name+"|"+p.team} value={p.name+"|"+p.team}>{p.name} ({p.team})</option>
+                  ))}
+                </select>
+                {val&&(()=>{
+                  const p=enriched.find(x=>(x.name+"|"+x.team)===val);
+                  if(!p)return null;
+                  return(
+                    <div style={{marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:13,color:"#e8eaf0",fontWeight:500}}>{p.name}</div>
+                        <div style={{fontSize:11,color:"#5a6380",marginTop:2}}>{p.position} · {p.team}</div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color,letterSpacing:2}}>{fmt(p.modelValue)}</div>
+                        <div style={{fontSize:10,color:getRatioColor(p.ratio),letterSpacing:1}}>{getRatioLabel(p.ratio)}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+
+          {/* Comparison panel — only show when both selected */}
+          {compareA&&compareB&&(()=>{
+            const pA=enriched.find(x=>(x.name+"|"+x.team)===compareA);
+            const pB=enriched.find(x=>(x.name+"|"+x.team)===compareB);
+            if(!pA||!pB)return null;
+
+            const SCORES=[
+              {key:"perfScore",    label:"Performance",    color:"#00e5a0"},
+              {key:"durScore",     label:"Durability",     color:"#4a9eff"},
+              {key:"scarScore",    label:"Scarcity",       color:"#f0c040"},
+              {key:"nonPScore",    label:"Non-Performance",color:"#ff7eb3"},
+              {key:"contractScore",label:"Contract",       color:"#a78bfa"},
+            ];
+
+            const STATS=[
+              {label:"Salary",         fmtA:fmt(pA.salary),          fmtB:fmt(pB.salary),          numA:pA.salary,          numB:pB.salary,          higherBetter:false},
+              {label:"Model Value",    fmtA:fmt(pA.modelValue),      fmtB:fmt(pB.modelValue),      numA:pA.modelValue,      numB:pB.modelValue,      higherBetter:true},
+              {label:"Value Ratio",    fmtA:pA.ratio.toFixed(2)+"x", fmtB:pB.ratio.toFixed(2)+"x", numA:pA.ratio,           numB:pB.ratio,           higherBetter:true},
+              {label:"Tackle Eff %",   fmtA:pA.tackleEff+"%",        fmtB:pB.tackleEff+"%",        numA:pA.tackleEff,       numB:pB.tackleEff,       higherBetter:true},
+              {label:"Missed Tackles", fmtA:pA.missedTackles,        fmtB:pB.missedTackles,        numA:pA.missedTackles,   numB:pB.missedTackles,   higherBetter:false},
+              {label:"m/Carry",        fmtA:pA.metresPerCarry+"m",   fmtB:pB.metresPerCarry+"m",   numA:pA.metresPerCarry,  numB:pB.metresPerCarry,  higherBetter:true},
+              {label:"Post-Contact m", fmtA:pA.postContact+"m",      fmtB:pB.postContact+"m",      numA:pA.postContact,     numB:pB.postContact,     higherBetter:true},
+              {label:"Try Assists",    fmtA:pA.tryAssists,           fmtB:pB.tryAssists,           numA:pA.tryAssists,      numB:pB.tryAssists,      higherBetter:true},
+              {label:"Linebreaks",     fmtA:pA.linebreaks,           fmtB:pB.linebreaks,           numA:pA.linebreaks,      numB:pB.linebreaks,      higherBetter:true},
+              {label:"Errors/G",       fmtA:pA.errors,               fmtB:pB.errors,               numA:pA.errors,          numB:pB.errors,           higherBetter:false},
+              {label:"Games 2024",     fmtA:pA.games2024,            fmtB:pB.games2024,            numA:pA.games2024,       numB:pB.games2024,       higherBetter:true},
+              {label:"Games 2023",     fmtA:pA.games2023,            fmtB:pB.games2023,            numA:pA.games2023,       numB:pB.games2023,       higherBetter:true},
+              {label:"Age",            fmtA:pA.age+" yrs",           fmtB:pB.age+" yrs",           numA:pA.age,             numB:pB.age,             higherBetter:false},
+              {label:"Instagram",      fmtA:pA.instagram.toLocaleString(), fmtB:pB.instagram.toLocaleString(), numA:pA.instagram, numB:pB.instagram, higherBetter:true},
+            ];
+
+            return(
+              <div>
+                {/* Header cards */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:10,marginBottom:16,alignItems:"center"}}>
+                  {[{p:pA,color:"#00e5a0"},{p:null},{p:pB,color:"#4a9eff"}].map((item,i)=>{
+                    if(!item.p)return(
+                      <div key="vs" style={{textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:"#2a3040",letterSpacing:4}}>VS</div>
+                    );
+                    const {p,color}=item;
+                    return(
+                      <div key={p.name} style={{background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"16px 18px"}}>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#e8eaf0",letterSpacing:2,marginBottom:2}}>{p.name}</div>
+                        <div style={{fontSize:11,color:"#5a6380",marginBottom:10}}>{p.position} · {p.team} · Age {p.age}</div>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                          {p.origin&&<span className="pill" style={{background:"#4a9eff22",color:"#4a9eff",border:"1px solid #4a9eff44"}}>SOO</span>}
+                          {p.intl&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Intl</span>}
+                          {p.captain&&<span className="pill" style={{background:"#ff7eb322",color:"#ff7eb3",border:"1px solid #ff7eb344"}}>Captain</span>}
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+                          <div>
+                            <div style={{fontSize:10,color:"#5a6380",letterSpacing:1}}>MODEL VALUE</div>
+                            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color,letterSpacing:2}}>{fmt(p.modelValue)}</div>
+                            <div style={{fontSize:10,color:"#5a6380"}}>Actual: {fmt(p.salary)}</div>
+                          </div>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:getRatioColor(p.ratio),letterSpacing:2}}>{p.ratio.toFixed(2)}x</div>
+                            <div style={{fontSize:9,color:getRatioColor(p.ratio),letterSpacing:1}}>{getRatioLabel(p.ratio)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-score radar-style bars */}
+                <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,padding:"18px 20px",marginBottom:14}}>
+                  <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Model Sub-Scores</div>
+                  {SCORES.map(({key,label,color})=>{
+                    const vA=pA[key]||0; const vB=pB[key]||0;
+                    const winA=vA>vB; const winB=vB>vA;
+                    return(
+                      <div key={key} style={{marginBottom:12}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <span style={{fontSize:11,color:winA?"#00e5a0":"#8892aa",fontWeight:winA?600:400,minWidth:40}}>{Math.round(vA*100)}</span>
+                          <span style={{fontSize:10,color,letterSpacing:1,textTransform:"uppercase"}}>{label}</span>
+                          <span style={{fontSize:11,color:winB?"#4a9eff":"#8892aa",fontWeight:winB?600:400,minWidth:40,textAlign:"right"}}>{Math.round(vB*100)}</span>
+                        </div>
+                        <div style={{display:"flex",gap:3,alignItems:"center"}}>
+                          {/* A bar — grows right to left */}
+                          <div style={{flex:1,display:"flex",justifyContent:"flex-end"}}>
+                            <div style={{width:`${Math.round(vA*100)}%`,height:8,background:"#00e5a0",borderRadius:"3px 0 0 3px",transition:"width 0.5s ease",opacity:winA?1:0.45}}/>
+                          </div>
+                          <div style={{width:2,height:12,background:"#2a3040",flexShrink:0}}/>
+                          {/* B bar — grows left to right */}
+                          <div style={{flex:1}}>
+                            <div style={{width:`${Math.round(vB*100)}%`,height:8,background:"#4a9eff",borderRadius:"0 3px 3px 0",transition:"width 0.5s ease",opacity:winB?1:0.45}}/>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Stat-by-stat table */}
+                <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,overflow:"hidden"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",background:"#0d1117",borderBottom:"1px solid #1e2535"}}>
+                    <div style={{padding:"10px 14px",fontSize:10,color:"#00e5a0",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>{pA.name.split(" ").pop()}</div>
+                    <div style={{padding:"10px 14px",fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",textAlign:"center"}}>STAT</div>
+                    <div style={{padding:"10px 14px",fontSize:10,color:"#4a9eff",letterSpacing:2,textTransform:"uppercase",fontWeight:700,textAlign:"right"}}>{pB.name.split(" ").pop()}</div>
+                  </div>
+                  {STATS.map(({label,fmtA,fmtB,numA,numB,higherBetter},i)=>{
+                    const aWins=higherBetter?(numA>numB):(numA<numB);
+                    const bWins=higherBetter?(numB>numA):(numB<numA);
+                    return(
+                      <div key={label} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",borderBottom:i<STATS.length-1?"1px solid #0f1520":"none",background:i%2===0?"#111623":"#0f1520"}}>
+                        <div style={{padding:"9px 14px",fontSize:12,color:aWins?"#00e5a0":"#8892aa",fontWeight:aWins?600:400}}>{fmtA}</div>
+                        <div style={{padding:"9px 14px",fontSize:10,color:"#5a6380",letterSpacing:1,textAlign:"center",textTransform:"uppercase",alignSelf:"center"}}>{label}</div>
+                        <div style={{padding:"9px 14px",fontSize:12,color:bWins?"#4a9eff":"#8892aa",fontWeight:bWins?600:400,textAlign:"right"}}>{fmtB}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Placeholder when not both selected */}
+          {!(compareA&&compareB)&&(
+            <div style={{textAlign:"center",padding:"60px 20px",color:"#3a4050",fontSize:13,letterSpacing:1}}>
+              SELECT TWO PLAYERS ABOVE TO COMPARE
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v16: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v17: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
