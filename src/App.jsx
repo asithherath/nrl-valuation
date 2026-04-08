@@ -3,15 +3,15 @@ import { useState, useMemo, useRef, useEffect } from "react";
 const SALARY_CAP = 11550000;
 
 const POSITION_BANDS = {
-  "Halfback":    { min: 200000, max: 1500000, scarcity: 0.95 },
-  "Five-Eighth": { min: 180000, max: 1300000, scarcity: 0.88 },
-  "Hooker":      { min: 160000, max: 1100000, scarcity: 0.90 },
-  "Fullback":    { min: 180000, max: 1300000, scarcity: 0.92 },
-  "Centre":      { min: 130000, max: 800000,  scarcity: 0.72 },
-  "Winger":      { min: 130000, max: 700000,  scarcity: 0.68 },
-  "Prop":        { min: 150000, max: 1350000, scarcity: 0.78 },
-  "Back Row":    { min: 140000, max: 900000,  scarcity: 0.74 },
-  "Lock":        { min: 140000, max: 950000,  scarcity: 0.76 },
+  "Halfback":    { min: 110000, max: 1500000, scarcity: 0.95, squadCeil: 500000 },
+  "Five-Eighth": { min: 110000, max: 1300000, scarcity: 0.88, squadCeil: 450000 },
+  "Hooker":      { min: 110000, max: 1100000, scarcity: 0.90, squadCeil: 450000 },
+  "Fullback":    { min: 110000, max: 1300000, scarcity: 0.92, squadCeil: 500000 },
+  "Centre":      { min: 100000, max:  750000, scarcity: 0.72, squadCeil: 320000 },
+  "Winger":      { min: 100000, max:  650000, scarcity: 0.68, squadCeil: 300000 },
+  "Prop":        { min: 100000, max: 1350000, scarcity: 0.78, squadCeil: 400000 },
+  "Back Row":    { min: 100000, max:  850000, scarcity: 0.74, squadCeil: 380000 },
+  "Lock":        { min: 100000, max:  900000, scarcity: 0.76, squadCeil: 400000 },
 };
 
 const CATEGORY_INFO = {
@@ -52,7 +52,7 @@ const CATEGORY_INFO = {
       { name: "Social Media Reach",  weight: "35%",  desc: "Instagram followers as a proxy for commercial marketability — jersey sales, sponsor activations, media value." },
       { name: "Club Captain",        weight: "+10%", desc: "Captains provide leadership and media presence beyond what shows up in the stats." },
     ],
-    note: "Lowest default weight (8%). Age is the primary driver; Instagram is secondary. Calibrated against Cleary, Haas, Munster, Walsh contract benchmarks.",
+    note: "Lowest default weight (8%). Age is the primary driver; Instagram is secondary. V15: piecewise model calibrated to $11.55M salary cap.",
   },
   contract: {
     title: "Contract Security", summary: "Years remaining on the player's current deal affects transfer value.",
@@ -560,14 +560,22 @@ function calcContractScore(p) {
   return 1.0;
 }
 const ELITE_ANCHOR=0.85;
+const SQUAD_THRESHOLD=0.72;
 function calcModelValue(p,weights) {
   const tw=weights.performance+weights.durability+weights.scarcity+weights.nonPerf+(weights.contract||0);
   const s=calcPerformanceScore(p)*(weights.performance/tw)+calcDurabilityScore(p)*(weights.durability/tw)+
     calcScarcityScore(p)*(weights.scarcity/tw)+calcNonPerfScore(p)*(weights.nonPerf/tw)+
     calcContractScore(p)*((weights.contract||0)/tw);
   const scaled=Math.min(1,s/ELITE_ANCHOR);
-  const b=POSITION_BANDS[p.position]||{min:130000,max:800000};
-  return Math.round((b.min+scaled*(b.max-b.min))/5000)*5000;
+  const b=POSITION_BANDS[p.position]||{min:100000,max:800000,squadCeil:350000};
+  const sc=b.squadCeil||350000;
+  let raw;
+  if(scaled<=SQUAD_THRESHOLD){
+    raw=b.min+(scaled/SQUAD_THRESHOLD)*(sc-b.min);
+  } else {
+    raw=sc+((scaled-SQUAD_THRESHOLD)/(1-SQUAD_THRESHOLD))*(b.max-sc);
+  }
+  return Math.round(raw/5000)*5000;
 }
 
 const fmt=v=>v>=1000000?`$${(v/1e6).toFixed(2)}M`:`$${(v/1000).toFixed(0)}K`;
@@ -746,7 +754,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V14 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V15 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -1031,7 +1039,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v14: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v15: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
