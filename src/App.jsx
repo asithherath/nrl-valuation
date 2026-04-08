@@ -655,6 +655,10 @@ export default function NRLValuation(){
   const [showOnlyUndervalued,setShowOnlyUndervalued]=useState(false);
   const [compareA,setCompareA]=useState(null);
   const [compareB,setCompareB]=useState(null);
+  const [compareTeamA,setCompareTeamA]=useState("All Teams");
+  const [compareTeamB,setCompareTeamB]=useState("All Teams");
+  const [compareSearchA,setCompareSearchA]=useState("");
+  const [compareSearchB,setCompareSearchB]=useState("");
 
   const enriched=useMemo(()=>players.map(p=>{
     const modelValue=calcModelValue(p,weights);
@@ -753,7 +757,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V17 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V18 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -1043,13 +1047,35 @@ export default function NRLValuation(){
         <div>
           {/* Player picker row */}
           <div style={{display:"flex",gap:12,marginBottom:20,flexWrap:"wrap"}}>
-            {[{label:"Player A",color:"#00e5a0",val:compareA,set:setCompareA},{label:"Player B",color:"#4a9eff",val:compareB,set:setCompareB}].map(({label,color,val,set})=>(
-              <div key={label} style={{flex:1,minWidth:260,background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"14px 16px"}}>
-                <div style={{fontSize:10,color,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>{label}</div>
+            {[
+              {label:"Player A",color:"#00e5a0",val:compareA,set:setCompareA,team:compareTeamA,setTeam:setCompareTeamA,srch:compareSearchA,setSrch:setCompareSearchA},
+              {label:"Player B",color:"#4a9eff",val:compareB,set:setCompareB,team:compareTeamB,setTeam:setCompareTeamB,srch:compareSearchB,setSrch:setCompareSearchB},
+            ].map(({label,color,val,set,team,setTeam,srch,setSrch})=>{
+              const filtered_=enriched
+                .filter(p=>team==="All Teams"||p.team===team)
+                .filter(p=>!srch||p.name.toLowerCase().includes(srch.toLowerCase()))
+                .sort((a,b)=>a.name.localeCompare(b.name));
+              return(
+              <div key={label} style={{flex:1,minWidth:280,background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"14px 16px"}}>
+                <div style={{fontSize:10,color,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>{label}</div>
+                {/* Team filter + search row */}
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <select value={team} onChange={e=>{setTeam(e.target.value);set(null);setSrch("");}}
+                    style={{flex:1,background:"#0d1117",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,cursor:"pointer"}}>
+                    {ALL_TEAMS.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                  <input
+                    placeholder="Search name..."
+                    value={srch}
+                    onChange={e=>{setSrch(e.target.value);set(null);}}
+                    style={{flex:1,background:"#0d1117",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,outline:"none"}}
+                  />
+                </div>
+                {/* Player dropdown — filtered */}
                 <select value={val||""} onChange={e=>set(e.target.value||null)}
                   style={{width:"100%",background:"#0d1117",border:`1px solid ${color}44`,color:"#e8eaf0",fontFamily:"inherit",fontSize:12,padding:"8px 10px",borderRadius:6,cursor:"pointer"}}>
-                  <option value="">— Select a player —</option>
-                  {[...enriched].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>(
+                  <option value="">— {filtered_.length} player{filtered_.length!==1?"s":""} —</option>
+                  {filtered_.map(p=>(
                     <option key={p.name+"|"+p.team} value={p.name+"|"+p.team}>{p.name} ({p.team})</option>
                   ))}
                 </select>
@@ -1070,7 +1096,8 @@ export default function NRLValuation(){
                   );
                 })()}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Comparison panel — only show when both selected */}
@@ -1200,7 +1227,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v17: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v18: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
