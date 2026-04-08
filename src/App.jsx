@@ -4,14 +4,14 @@ const SALARY_CAP = 11550000;
 
 const POSITION_BANDS = {
   "Halfback":    { min: 200000, max: 1500000, scarcity: 0.95 },
-  "Five-Eighth": { min: 180000, max: 1200000, scarcity: 0.88 },
-  "Hooker":      { min: 160000, max: 1000000, scarcity: 0.90 },
-  "Fullback":    { min: 180000, max: 1400000, scarcity: 0.92 },
-  "Centre":      { min: 130000, max: 750000,  scarcity: 0.72 },
-  "Winger":      { min: 130000, max: 650000,  scarcity: 0.68 },
-  "Prop":        { min: 150000, max: 1100000, scarcity: 0.78 },
-  "Back Row":    { min: 140000, max: 850000,  scarcity: 0.74 },
-  "Lock":        { min: 140000, max: 900000,  scarcity: 0.76 },
+  "Five-Eighth": { min: 180000, max: 1300000, scarcity: 0.88 },
+  "Hooker":      { min: 160000, max: 1100000, scarcity: 0.90 },
+  "Fullback":    { min: 180000, max: 1300000, scarcity: 0.92 },
+  "Centre":      { min: 130000, max: 800000,  scarcity: 0.72 },
+  "Winger":      { min: 130000, max: 700000,  scarcity: 0.68 },
+  "Prop":        { min: 150000, max: 1350000, scarcity: 0.78 },
+  "Back Row":    { min: 140000, max: 900000,  scarcity: 0.74 },
+  "Lock":        { min: 140000, max: 950000,  scarcity: 0.76 },
 };
 
 const CATEGORY_INFO = {
@@ -43,7 +43,7 @@ const CATEGORY_INFO = {
       { name: "State of Origin",     weight: "+8%",  desc: "Selected for NSW or QLD in the last 2 years — top-26 positional quality nationally." },
       { name: "Intl Rep", weight: "+6%",  desc: "Represented any nation internationally in 2024/25 (Australia, NZ, Samoa, Tonga, Fiji, PNG, Cook Islands, England)." },
     ],
-    note: "Scarcity lifts the positional band floor. A rep halfback is valued higher than a club-only halfback with identical stats.",
+    note: "Scarcity lifts the positional band floor. Bands calibrated to 2026 NRL market (Prop ceiling raised to $1.35M for Haas-tier players, Fullback reduced to $1.3M).",
   },
   nonPerf: {
     title: "Non-Performance Value", summary: "What does the player bring beyond the stats?",
@@ -52,7 +52,7 @@ const CATEGORY_INFO = {
       { name: "Social Media Reach",  weight: "35%",  desc: "Instagram followers as a proxy for commercial marketability — jersey sales, sponsor activations, media value." },
       { name: "Club Captain",        weight: "+10%", desc: "Captains provide leadership and media presence beyond what shows up in the stats." },
     ],
-    note: "Lowest default weight (8%) but adjustable — agents would weight it higher, club analysts lower.",
+    note: "Lowest default weight (8%). Age is the primary driver; Instagram is secondary. Calibrated against Cleary, Haas, Munster, Walsh contract benchmarks.",
   },
   contract: {
     title: "Contract Security", summary: "Years remaining on the player's current deal affects transfer value.",
@@ -530,20 +530,27 @@ const SEED_PLAYERS = [
 ];
 
 function calcPerformanceScore(p) {
-  return (p.tackleEff/100)*0.25 + Math.max(0,1-p.missedTackles/3)*0.15 +
-    Math.min(p.metresPerCarry/12,1)*0.20 + Math.min(p.postContact/5,1)*0.10 +
-    Math.min((p.tryAssists+p.linebreaks)/35,1)*0.20 + Math.max(0,1-p.errors/2)*0.10;
+  const fwd=["Prop","Hooker","Back Row","Lock"].includes(p.position);
+  const te=Math.min(1,Math.max(0,(p.tackleEff-80)/15));
+  const mt=Math.min(1,Math.max(0,1-p.missedTackles/3));
+  const mpc=fwd?Math.min(1,Math.max(0,(p.metresPerCarry-6)/4)):Math.min(1,Math.max(0,(p.metresPerCarry-5)/6));
+  const pc=Math.min(1,Math.max(0,(p.postContact-1.5)/3.5));
+  const ta=fwd?Math.min(1,Math.max(0,(p.tryAssists+p.linebreaks)/16)):Math.min(1,Math.max(0,(p.tryAssists+p.linebreaks)/40));
+  const err=Math.min(1,Math.max(0,1-p.errors/2));
+  return te*0.25+mt*0.15+mpc*0.20+pc*0.10+ta*0.20+err*0.10;
 }
 function calcDurabilityScore(p) {
-  return Math.min(((p.games2024+p.games2023+p.games2022)/3)/24,1);
+  return Math.min(Math.max(0,(p.games2024+p.games2023+p.games2022)/81),1);
 }
 function calcScarcityScore(p) {
   const base=(POSITION_BANDS[p.position]?POSITION_BANDS[p.position].scarcity:0.75)||0.75;
   return Math.min(base+(p.origin?0.08:0)+(p.intl?0.06:0),1);
 }
 function calcNonPerfScore(p) {
-  const age=p.age<=23?1.0:p.age<=27?0.85:p.age<=30?0.70:0.55;
-  return Math.min(age*0.55+Math.min(p.instagram/600000,1)*0.35+(p.captain?0.10:0),1);
+  const a=p.age;
+  const age=a<=22?1.0:a<=26?1.0-(a-22)*0.04:a<=30?0.84-(a-26)*0.06:Math.max(0.4,0.60-(a-30)*0.05);
+  const ig=Math.min(1,Math.log10(Math.max(1,p.instagram))/6.5);
+  return Math.min(age*0.70+ig*0.20+(p.captain?0.10:0),1);
 }
 function calcContractScore(p) {
   const cy = (typeof p.contractYears === "number") ? p.contractYears : 1;
@@ -552,13 +559,15 @@ function calcContractScore(p) {
   if(cy === 2) return 0.75;
   return 1.0;
 }
+const ELITE_ANCHOR=0.85;
 function calcModelValue(p,weights) {
   const tw=weights.performance+weights.durability+weights.scarcity+weights.nonPerf+(weights.contract||0);
   const s=calcPerformanceScore(p)*(weights.performance/tw)+calcDurabilityScore(p)*(weights.durability/tw)+
     calcScarcityScore(p)*(weights.scarcity/tw)+calcNonPerfScore(p)*(weights.nonPerf/tw)+
     calcContractScore(p)*((weights.contract||0)/tw);
+  const scaled=Math.min(1,s/ELITE_ANCHOR);
   const b=POSITION_BANDS[p.position]||{min:130000,max:800000};
-  return Math.round((b.min+s*(b.max-b.min))/5000)*5000;
+  return Math.round((b.min+scaled*(b.max-b.min))/5000)*5000;
 }
 
 const fmt=v=>v>=1000000?`$${(v/1e6).toFixed(2)}M`:`$${(v/1000).toFixed(0)}K`;
@@ -737,7 +746,7 @@ export default function NRLValuation(){
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V13 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V14 · ALL CLUBS</span>
         </div>
         <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -1022,7 +1031,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v13: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v14: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
