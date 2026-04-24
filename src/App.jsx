@@ -773,7 +773,7 @@ export default function NRLValuation(){
       {/* WEIGHTS */}
       <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:12,padding:"18px 22px",marginTop:20,marginBottom:14}}>
         <div style={{fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
-          Model Weights — click <span style={{fontFamily:"serif",fontStyle:"italic"}}>i</span> for methodology
+          Model Weights — click <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:14,height:14,borderRadius:"50%",border:"1px solid #8a95b0",fontSize:9,color:"#8a95b0",fontFamily:"sans-serif",fontStyle:"normal",fontWeight:600,verticalAlign:"middle",marginBottom:1}}>i</span> for methodology
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:18}}>
           {WCONF.map(({key,label,color})=>(
