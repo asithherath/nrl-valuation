@@ -599,11 +599,11 @@ function InfoTooltip({category,color}){
         onMouseEnter={e=>{e.currentTarget.style.borderColor=color;e.currentTarget.style.color=color;e.currentTarget.style.background=color+"22"}}
         onMouseLeave={e=>{if(!open){e.currentTarget.style.borderColor=color+"66";e.currentTarget.style.color=color+"99";e.currentTarget.style.background="transparent"}}}>i</button>
       {open&&(
-        <div style={{position:"absolute",top:"calc(100% + 10px)",left:"50%",transform:"translateX(-50%)",zIndex:999,width:310,background:"#0d1117",border:`1px solid ${color}44`,borderRadius:10,boxShadow:`0 8px 32px rgba(0,0,0,0.6)`,overflow:"hidden",animation:"fadeIn 0.15s ease"}}>
-          <div style={{position:"absolute",top:-5,left:"50%",width:9,height:9,background:"#0d1117",border:`1px solid ${color}44`,borderBottom:"none",borderRight:"none",transform:"translateX(-50%) rotate(45deg)"}}/>
+        <div style={{position:"absolute",top:"calc(100% + 10px)",left:"50%",transform:"translateX(-50%)",zIndex:999,width:310,background:"#1a1f2e",border:`1px solid ${color}44`,borderRadius:10,boxShadow:`0 8px 32px rgba(0,0,0,0.6)`,overflow:"hidden",animation:"fadeIn 0.15s ease"}}>
+          <div style={{position:"absolute",top:-5,left:"50%",width:9,height:9,background:"#1a1f2e",border:`1px solid ${color}44`,borderBottom:"none",borderRight:"none",transform:"translateX(-50%) rotate(45deg)"}}/>
           <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${color}22`,background:color+"0a"}}>
             <div style={{fontSize:11,color,letterSpacing:1.5,textTransform:"uppercase",fontWeight:500,marginBottom:4}}>{info.title}</div>
-            <div style={{fontSize:11,color:"#8892aa",lineHeight:1.5}}>{info.summary}</div>
+            <div style={{fontSize:11,color:"#a8b2cc",lineHeight:1.5}}>{info.summary}</div>
           </div>
           <div style={{padding:"8px 0"}}>
             {info.metrics.map((m,i)=>(
@@ -722,28 +722,28 @@ export default function NRLValuation(){
   },[enriched]);
 
   return(
-    <div style={{fontFamily:"'DM Mono','Courier New',monospace",background:"#0d1117",minHeight:"100vh",color:"#e8eaf0",paddingBottom:60}}>
+    <div style={{fontFamily:"'DM Mono','Courier New',monospace",background:"#1a1f2e",minHeight:"100vh",color:"#e8eaf0",paddingBottom:60}}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap');
       *{box-sizing:border-box;}
-      ::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:#0d1117;}::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px;}
-      .rh:hover{background:#151c28!important;cursor:pointer;}
+      ::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:#1a1f2e;}::-webkit-scrollbar-thumb{background:#3a4a64;border-radius:2px;}
+      .rh:hover{background:#2a3448!important;cursor:pointer;}
       .th:hover{color:#00e5a0;cursor:pointer;}
       .tab-btn{background:none;border:none;font-family:inherit;cursor:pointer;padding:9px 18px;font-size:11px;letter-spacing:2px;text-transform:uppercase;transition:all 0.2s;}
-      .wb{background:#1a1f2e;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:13px;cursor:pointer;width:26px;height:26px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;}
+      .wb{background:#2a3448;border:1px solid #3a4a64;color:#e8eaf0;font-family:inherit;font-size:13px;cursor:pointer;width:26px;height:26px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;}
       .wb:hover{border-color:#00e5a0;color:#00e5a0;}
-      select,input{background:#1a1f2e;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:11px;padding:6px 10px;border-radius:6px;letter-spacing:1px;}
+      select,input{background:#232b3e;border:1px solid #3a4a64;color:#e8eaf0;font-family:inherit;font-size:11px;padding:6px 10px;border-radius:6px;letter-spacing:1px;}
       select:focus,input:focus{outline:none;border-color:#00e5a0;}
       input::placeholder{color:#3a4560;}
       .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;letter-spacing:1.5px;font-weight:500;}
-      .ub{background:#1a1f2e;border:1px solid #2a3040;color:#5a6380;font-family:inherit;font-size:10px;cursor:pointer;padding:3px 8px;border-radius:4px;transition:all 0.2s;}
+      .ub{background:#2a3448;border:1px solid #3a4a64;color:#8a95b0;font-family:inherit;font-size:10px;cursor:pointer;padding:3px 8px;border-radius:4px;transition:all 0.2s;}
       .ub:hover{border-color:#4a9eff;color:#4a9eff;}
-      .ra{background:#0d1117;border:1px solid #2a3040;color:#e8eaf0;font-family:inherit;font-size:11px;cursor:pointer;padding:8px 16px;border-radius:8px;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;}
+      .ra{background:#232b3e;border:1px solid #3a4a64;color:#e8eaf0;font-family:inherit;font-size:11px;cursor:pointer;padding:8px 16px;border-radius:8px;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;}
       .ra:hover:not(:disabled){border-color:#00e5a0;color:#00e5a0;}
       .ra:disabled{opacity:0.4;cursor:not-allowed;}
-      .close-btn{background:none;border:1px solid #2a3040;color:#888;font-family:inherit;font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;transition:all 0.2s;}
+      .close-btn{background:none;border:1px solid #3a4a64;color:#a8b2cc;font-family:inherit;font-size:11px;cursor:pointer;padding:6px 14px;border-radius:6px;transition:all 0.2s;}
       .close-btn:hover{border-color:#555;color:#e8eaf0;}
-      .fchk{background:none;border:1px solid #2a3040;color:#5a6380;font-family:inherit;font-size:10px;cursor:pointer;padding:5px 12px;border-radius:6px;letter-spacing:1px;transition:all 0.2s;white-space:nowrap;}
+      .fchk{background:none;border:1px solid #3a4a64;color:#8a95b0;font-family:inherit;font-size:10px;cursor:pointer;padding:5px 12px;border-radius:6px;letter-spacing:1px;transition:all 0.2s;white-space:nowrap;}
       .fchk.active{border-color:#00e5a044;background:#00e5a011;color:#00e5a0;}
       .fchk.active-red{border-color:#ff555544;background:#ff555511;color:#ff5555;}
       @keyframes spin{to{transform:rotate(360deg)}} .spin{animation:spin 1s linear infinite;display:inline-block;}
@@ -751,15 +751,15 @@ export default function NRLValuation(){
     `}</style>
 
     {/* HEADER */}
-    <div style={{background:"linear-gradient(135deg,#0d1117 0%,#111827 100%)",borderBottom:"1px solid #1e2535",padding:"28px 28px 20px"}}>
+    <div style={{background:"linear-gradient(135deg,#1a1f2e 0%,#222d40 100%)",borderBottom:"1px solid #2e3a52",padding:"28px 28px 20px"}}>
       <div style={{maxWidth:1200,margin:"0 auto"}}>
         <div style={{display:"flex",alignItems:"flex-end",gap:14,marginBottom:6,flexWrap:"wrap"}}>
           {["NRL","VALUATION","ENGINE"].map((w,i)=>(
             <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
           ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#2a3040",letterSpacing:3,paddingBottom:5}}>V19 · ALL CLUBS</span>
+          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#3a4a64",letterSpacing:3,paddingBottom:5}}>V20 · ALL CLUBS</span>
         </div>
-        <div style={{fontSize:11,color:"#5a6380",letterSpacing:2,textTransform:"uppercase"}}>
+        <div style={{fontSize:11,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase"}}>
           {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
         </div>
       </div>
@@ -768,8 +768,8 @@ export default function NRLValuation(){
     <div style={{maxWidth:1200,margin:"0 auto",padding:"0 24px"}}>
 
       {/* WEIGHTS */}
-      <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,padding:"18px 22px",marginTop:20,marginBottom:14}}>
-        <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
+      <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:12,padding:"18px 22px",marginTop:20,marginBottom:14}}>
+        <div style={{fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
           Model Weights — click <span style={{fontFamily:"serif",fontStyle:"italic"}}>i</span> for methodology
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:18}}>
@@ -808,10 +808,10 @@ export default function NRLValuation(){
           ↓ Overpaid only
         </button>
         <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-          <div style={{display:"flex",background:"#111623",border:"1px solid #1e2535",borderRadius:8,overflow:"hidden"}}>
+          <div style={{display:"flex",background:"#232b3e",border:"1px solid #2e3a52",borderRadius:8,overflow:"hidden"}}>
             {["table","chart","teams","compare"].map(t=>(
               <button key={t} className="tab-btn" onClick={()=>setTab(t)}
-                style={{color:tab===t?"#00e5a0":"#5a6380",borderBottom:tab===t?"2px solid #00e5a0":"2px solid transparent"}}>
+                style={{color:tab===t?"#00e5a0":"#8a95b0",borderBottom:tab===t?"2px solid #00e5a0":"2px solid transparent"}}>
                 {t==="table"?"Players":t==="chart"?"Chart":t==="teams"?"Teams":"Compare"}
               </button>
             ))}
@@ -822,7 +822,7 @@ export default function NRLValuation(){
         </div>
       </div>
 
-      {refreshAll&&<div style={{background:"#0d1117",borderRadius:4,height:3,overflow:"hidden",marginBottom:12}}>
+      {refreshAll&&<div style={{background:"#1a1f2e",borderRadius:4,height:3,overflow:"hidden",marginBottom:12}}>
         <div style={{width:`${refreshProg}%`,height:"100%",background:"#00e5a0",transition:"width 0.3s ease"}}/>
       </div>}
 
@@ -840,15 +840,15 @@ export default function NRLValuation(){
 
       {/* TABLE */}
       {tab==="table"&&(
-        <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,overflow:"hidden"}}>
+        <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:12,overflow:"hidden"}}>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead>
-                <tr style={{borderBottom:"1px solid #1e2535",background:"#0d1117"}}>
+                <tr style={{borderBottom:"1px solid #2e3a52",background:"#1a1f2e"}}>
                   {[["name","Player"],["pos","Pos"],["team","Team"],["salary","Salary"],["modelValue","Model Value"],["delta","Delta"],["ratio","Value Ratio"],["live",""]].map(([key,lbl])=>(
                     <th key={key} className={key!=="pos"&&key!=="team"&&key!=="live"?"th":undefined}
                       onClick={()=>key!=="pos"&&key!=="team"&&key!=="live"&&toggleSort(key)}
-                      style={{padding:"11px 12px",textAlign:key==="name"?"left":"right",color:"#5a6380",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",whiteSpace:"nowrap",cursor:["pos","team","live"].includes(key)?"default":"pointer"}}>
+                      style={{padding:"11px 12px",textAlign:key==="name"?"left":"right",color:"#8a95b0",fontSize:10,letterSpacing:1.5,textTransform:"uppercase",whiteSpace:"nowrap",cursor:["pos","team","live"].includes(key)?"default":"pointer"}}>
                       {lbl}{!["pos","team","live"].includes(key)&&(
                         sortBy===key?<span style={{marginLeft:4,color:"#00e5a0"}}>{sortDir==="desc"?"↓":"↑"}</span>:<span style={{opacity:0.3,marginLeft:4}}>↕</span>
                       )}
@@ -859,27 +859,27 @@ export default function NRLValuation(){
               <tbody>
                 {filtered.map((p,i)=>(
                   <tr key={p.name+"|"+p.team} className="rh" onClick={()=>setSelected(selected===(p.name+"|"+p.team)?null:(p.name+"|"+p.team))}
-                    style={{borderBottom:"1px solid #151d28",background:selected===(p.name+"|"+p.team)?"#151c28":i%2===0?"#111623":"#0f1520"}}>
+                    style={{borderBottom:"1px solid #151d28",background:selected===(p.name+"|"+p.team)?"#2a3448":i%2===0?"#232b3e":"#1e2638"}}>
                     <td style={{padding:"10px 12px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontWeight:500,color:"#e8eaf0"}}>{p.name}</span>
                         {p._updated&&<span className="pill" style={{background:"#00e5a022",color:"#00e5a0",border:"1px solid #00e5a044"}}>LIVE</span>}
                       </div>
-                      <div style={{fontSize:10,color:"#5a6380",marginTop:2}}>
+                      <div style={{fontSize:10,color:"#8a95b0",marginTop:2}}>
                         {p.origin&&<span style={{color:"#4a9eff",marginRight:5}}>◆ SOO</span>}
                         {p.intl&&<span style={{color:"#f0c040",marginRight:5}}>★ INTL</span>}
                         {p.captain&&<span style={{color:"#ff7eb3"}}>© CAP</span>}
                       </div>
                     </td>
-                    <td style={{padding:"10px 12px",textAlign:"right",color:"#8892aa",fontSize:11,whiteSpace:"nowrap"}}>{p.position}</td>
-                    <td style={{padding:"10px 12px",textAlign:"right",color:"#5a6380",fontSize:10,whiteSpace:"nowrap"}}>{p.team}</td>
+                    <td style={{padding:"10px 12px",textAlign:"right",color:"#a8b2cc",fontSize:11,whiteSpace:"nowrap"}}>{p.position}</td>
+                    <td style={{padding:"10px 12px",textAlign:"right",color:"#8a95b0",fontSize:10,whiteSpace:"nowrap"}}>{p.team}</td>
                     <td style={{padding:"10px 12px",textAlign:"right"}}>
                       <div style={{color:"#e8eaf0"}}>{fmt(p.salary)}</div>
-                      <div style={{fontSize:10,color:"#5a6380"}}>{cpct(p.salary)}</div>
+                      <div style={{fontSize:10,color:"#8a95b0"}}>{cpct(p.salary)}</div>
                     </td>
                     <td style={{padding:"10px 12px",textAlign:"right"}}>
                       <div style={{color:"#00e5a0"}}>{fmt(p.modelValue)}</div>
-                      <div style={{fontSize:10,color:"#5a6380"}}>{cpct(p.modelValue)}</div>
+                      <div style={{fontSize:10,color:"#8a95b0"}}>{cpct(p.modelValue)}</div>
                     </td>
                     <td style={{padding:"10px 12px",textAlign:"right"}}>
                       <span style={{color:p.delta>=0?"#00e5a0":"#ff5555",fontWeight:500}}>{p.delta>=0?"+":""}{fmt(p.delta)}</span>
@@ -906,8 +906,8 @@ export default function NRLValuation(){
 
       {/* CHART */}
       {tab==="chart"&&(
-        <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:12,padding:"22px"}}>
-          <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:18}}>
+        <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:12,padding:"22px"}}>
+          <div style={{fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",marginBottom:18}}>
             Model Value vs. Actual Salary — {filtered.length} players sorted by value ratio
           </div>
           <div style={{maxHeight:600,overflowY:"auto",paddingRight:8}}>
@@ -918,17 +918,17 @@ export default function NRLValuation(){
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:5,alignItems:"center"}}>
                     <div>
                       <span style={{fontSize:12,color:selected===(p.name+"|"+p.team)?"#00e5a0":"#e8eaf0"}}>{p.name}</span>
-                      <span style={{fontSize:10,color:"#5a6380",marginLeft:8}}>{p.position} · {p.team}</span>
+                      <span style={{fontSize:10,color:"#8a95b0",marginLeft:8}}>{p.position} · {p.team}</span>
                     </div>
                     <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:getRatioColor(p.ratio),letterSpacing:1}}>{p.ratio.toFixed(2)}x</span>
                   </div>
-                  {[["Actual",p.salary,"#3a4560"],["Model",p.modelValue,getRatioColor(p.ratio)]].map(([l,v,c])=>(
+                  {[["Actual",p.salary,"#6a7a96"],["Model",p.modelValue,getRatioColor(p.ratio)]].map(([l,v,c])=>(
                     <div key={l} style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                      <div style={{width:48,fontSize:10,color:l==="Model"?"#00e5a0":"#5a6380",textAlign:"right",flexShrink:0}}>{l}</div>
+                      <div style={{width:48,fontSize:10,color:l==="Model"?"#00e5a0":"#8a95b0",textAlign:"right",flexShrink:0}}>{l}</div>
                       <div style={{flex:1,background:"#1a1f2e",borderRadius:3,height:7,overflow:"hidden"}}>
                         <div style={{width:`${(v/maxVal)*100}%`,height:"100%",background:c,borderRadius:3,transition:"width 0.5s ease"}}/>
                       </div>
-                      <div style={{width:62,fontSize:10,color:l==="Model"?c:"#8892aa",flexShrink:0}}>{fmt(v)}</div>
+                      <div style={{width:62,fontSize:10,color:l==="Model"?c:"#a8b2cc",flexShrink:0}}>{fmt(v)}</div>
                     </div>
                   ))}
                 </div>
@@ -948,23 +948,23 @@ export default function NRLValuation(){
             const overpaid=tp.filter(p=>p.ratio<0.95).length;
             const capEfficiency=(td.model/td.actual);
             return(
-              <div key={team} style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,padding:"16px 18px",cursor:"pointer"}}
+              <div key={team} style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:10,padding:"16px 18px",cursor:"pointer"}}
                 onClick={()=>{setFilterTeam(team);setTab("table");}}>
                 <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#e8eaf0",letterSpacing:2,marginBottom:6,lineHeight:1.2}}>{team}</div>
                 <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                   <span style={{fontSize:10,color:"#00e5a0",background:"#00e5a014",padding:"2px 8px",borderRadius:10}}>{undervalued} undervalued</span>
                   <span style={{fontSize:10,color:"#ff5555",background:"#ff555514",padding:"2px 8px",borderRadius:10}}>{overpaid} overpaid</span>
                 </div>
-                <div style={{fontSize:10,color:"#5a6380",marginBottom:6}}>
+                <div style={{fontSize:10,color:"#8a95b0",marginBottom:6}}>
                   Cap: {fmt(td.actual)} actual vs {fmt(td.model)} model
                 </div>
-                <div style={{background:"#0d1117",borderRadius:4,height:5,overflow:"hidden",marginBottom:10}}>
+                <div style={{background:"#1a1f2e",borderRadius:4,height:5,overflow:"hidden",marginBottom:10}}>
                   <div style={{width:`${Math.min((td.actual/SALARY_CAP)*100,100)}%`,height:"100%",background:capEfficiency>=1?"#00e5a0":"#ff9a4a"}}/>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   {tp.slice(0,3).map(p=>(
                     <div key={p.name+"|"+p.team} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontSize:10,color:"#8892aa"}}>{p.name}</span>
+                      <span style={{fontSize:10,color:"#a8b2cc"}}>{p.name}</span>
                       <span style={{fontSize:10,color:getRatioColor(p.ratio),fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>{p.ratio.toFixed(2)}x</span>
                     </div>
                   ))}
@@ -977,7 +977,7 @@ export default function NRLValuation(){
 
       {/* PLAYER DETAIL */}
       {selectedPlayer&&(
-        <div style={{background:"#111623",border:`1px solid ${getRatioColor(selectedPlayer.ratio)}44`,borderRadius:12,padding:"22px",marginTop:16,position:"relative"}}>
+        <div style={{background:"#232b3e",border:`1px solid ${getRatioColor(selectedPlayer.ratio)}44`,borderRadius:12,padding:"22px",marginTop:16,position:"relative"}}>
           <button className="close-btn" onClick={()=>setSelected(null)} style={{position:"absolute",top:18,right:18}}>✕</button>
           <div style={{display:"flex",alignItems:"flex-start",gap:20,marginBottom:18,flexWrap:"wrap"}}>
             <div>
@@ -985,7 +985,7 @@ export default function NRLValuation(){
                 {selectedPlayer.name}
                 {selectedPlayer._updated&&<span className="pill" style={{marginLeft:10,background:"#00e5a022",color:"#00e5a0",border:"1px solid #00e5a044"}}>LIVE</span>}
               </div>
-              <div style={{fontSize:11,color:"#5a6380",letterSpacing:1,marginBottom:8}}>{selectedPlayer.position} · {selectedPlayer.team} · Age {selectedPlayer.age}</div>
+              <div style={{fontSize:11,color:"#8a95b0",letterSpacing:1,marginBottom:8}}>{selectedPlayer.position} · {selectedPlayer.team} · Age {selectedPlayer.age}</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {selectedPlayer.origin&&<span className="pill" style={{background:"#4a9eff22",color:"#4a9eff",border:"1px solid #4a9eff44"}}>SOO</span>}
                 {selectedPlayer.intl&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Intl Rep</span>}
@@ -999,14 +999,14 @@ export default function NRLValuation(){
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:16}}>
             {[
-              {label:"Actual Salary",value:fmt(selectedPlayer.salary),sub:cpct(selectedPlayer.salary)+" of cap",color:"#8892aa"},
+              {label:"Actual Salary",value:fmt(selectedPlayer.salary),sub:cpct(selectedPlayer.salary)+" of cap",color:"#a8b2cc"},
               {label:"Model Value",value:fmt(selectedPlayer.modelValue),sub:cpct(selectedPlayer.modelValue)+" of cap",color:"#00e5a0"},
               {label:"Delta",value:(selectedPlayer.delta>=0?"+":"")+fmt(selectedPlayer.delta),sub:selectedPlayer.delta>=0?"Undervalued":"Overpaid",color:selectedPlayer.delta>=0?"#00e5a0":"#ff5555"},
             ].map(({label,value,sub,color})=>(
-              <div key={label} style={{background:"#0d1117",borderRadius:8,padding:"14px 16px",border:"1px solid #1e2535"}}>
-                <div style={{fontSize:10,color:"#5a6380",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{label}</div>
+              <div key={label} style={{background:"#1a1f2e",borderRadius:8,padding:"14px 16px",border:"1px solid #2e3a52"}}>
+                <div style={{fontSize:10,color:"#8a95b0",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>{label}</div>
                 <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color,letterSpacing:2}}>{value}</div>
-                <div style={{fontSize:10,color:"#5a6380",marginTop:2}}>{sub}</div>
+                <div style={{fontSize:10,color:"#8a95b0",marginTop:2}}>{sub}</div>
               </div>
             ))}
           </div>
@@ -1018,7 +1018,7 @@ export default function NRLValuation(){
               {key:"nonPScore",catKey:"nonPerf",color:"#ff7eb3",metrics:[["Age",selectedPlayer.age+" yrs"],["Instagram",selectedPlayer.instagram.toLocaleString()],["Captain",selectedPlayer.captain?"Yes":"No"]]},
               {key:"contractScore",catKey:"contract",color:"#a78bfa",metrics:[["Years Remaining",(selectedPlayer.contractYears||0)],["Status",(selectedPlayer.contractYears||0)===0?"Off-contract":(selectedPlayer.contractYears||0)===1?"Final year":(selectedPlayer.contractYears||0)===2?"2 yrs secured":"Long-term"]]},
             ].map(({key,catKey,color,metrics})=>(
-              <div key={key} style={{background:"#0d1117",borderRadius:8,padding:"14px 16px",border:`1px solid ${color}22`}}>
+              <div key={key} style={{background:"#1a1f2e",borderRadius:8,padding:"14px 16px",border:`1px solid ${color}22`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center"}}>
                     <div style={{fontSize:10,color,letterSpacing:1.5,textTransform:"uppercase"}}>{CATEGORY_INFO[catKey].title}</div>
@@ -1030,8 +1030,8 @@ export default function NRLValuation(){
                 <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:4}}>
                   {metrics.map(([l,v])=>(
                     <div key={l} style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:11,color:"#5a6380"}}>{l}</span>
-                      <span style={{fontSize:11,color:"#8892aa"}}>{v}</span>
+                      <span style={{fontSize:11,color:"#8a95b0"}}>{l}</span>
+                      <span style={{fontSize:11,color:"#a8b2cc"}}>{v}</span>
                     </div>
                   ))}
                 </div>
@@ -1056,24 +1056,24 @@ export default function NRLValuation(){
                 .filter(p=>!srch||p.name.toLowerCase().includes(srch.toLowerCase()))
                 .sort((a,b)=>a.name.localeCompare(b.name));
               return(
-              <div key={label} style={{flex:1,minWidth:280,background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"14px 16px"}}>
+              <div key={label} style={{flex:1,minWidth:280,background:"#232b3e",border:`1px solid ${color}44`,borderRadius:10,padding:"14px 16px"}}>
                 <div style={{fontSize:10,color,letterSpacing:2,textTransform:"uppercase",marginBottom:10}}>{label}</div>
                 {/* Team filter + search row */}
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
                   <select value={team} onChange={e=>{setTeam(e.target.value);set(null);setSrch("");}}
-                    style={{flex:1,background:"#0d1117",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,cursor:"pointer"}}>
+                    style={{flex:1,background:"#1a1f2e",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,cursor:"pointer"}}>
                     {ALL_TEAMS.map(t=><option key={t}>{t}</option>)}
                   </select>
                   <input
                     placeholder="Search name..."
                     value={srch}
                     onChange={e=>{setSrch(e.target.value);set(null);}}
-                    style={{flex:1,background:"#0d1117",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,outline:"none"}}
+                    style={{flex:1,background:"#1a1f2e",border:"1px solid #2a3040",color:"#e8eaf0",fontFamily:"inherit",fontSize:11,padding:"6px 8px",borderRadius:6,outline:"none"}}
                   />
                 </div>
                 {/* Player dropdown — filtered */}
                 <select value={val||""} onChange={e=>set(e.target.value||null)}
-                  style={{width:"100%",background:"#0d1117",border:`1px solid ${color}44`,color:"#e8eaf0",fontFamily:"inherit",fontSize:12,padding:"8px 10px",borderRadius:6,cursor:"pointer"}}>
+                  style={{width:"100%",background:"#1a1f2e",border:`1px solid ${color}44`,color:"#e8eaf0",fontFamily:"inherit",fontSize:12,padding:"8px 10px",borderRadius:6,cursor:"pointer"}}>
                   <option value="">— {filtered_.length} player{filtered_.length!==1?"s":""} —</option>
                   {filtered_.map(p=>(
                     <option key={p.name+"|"+p.team} value={p.name+"|"+p.team}>{p.name} ({p.team})</option>
@@ -1086,7 +1086,7 @@ export default function NRLValuation(){
                     <div style={{marginTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div>
                         <div style={{fontSize:13,color:"#e8eaf0",fontWeight:500}}>{p.name}</div>
-                        <div style={{fontSize:11,color:"#5a6380",marginTop:2}}>{p.position} · {p.team}</div>
+                        <div style={{fontSize:11,color:"#8a95b0",marginTop:2}}>{p.position} · {p.team}</div>
                       </div>
                       <div style={{textAlign:"right"}}>
                         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color,letterSpacing:2}}>{fmt(p.modelValue)}</div>
@@ -1137,13 +1137,13 @@ export default function NRLValuation(){
                 <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:10,marginBottom:16,alignItems:"center"}}>
                   {[{p:pA,color:"#00e5a0"},{p:null},{p:pB,color:"#4a9eff"}].map((item,i)=>{
                     if(!item.p)return(
-                      <div key="vs" style={{textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:"#2a3040",letterSpacing:4}}>VS</div>
+                      <div key="vs" style={{textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:32,color:"#3a4a64",letterSpacing:4}}>VS</div>
                     );
                     const {p,color}=item;
                     return(
-                      <div key={p.name} style={{background:"#111623",border:`1px solid ${color}44`,borderRadius:10,padding:"16px 18px"}}>
+                      <div key={p.name} style={{background:"#232b3e",border:`1px solid ${color}44`,borderRadius:10,padding:"16px 18px"}}>
                         <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#e8eaf0",letterSpacing:2,marginBottom:2}}>{p.name}</div>
-                        <div style={{fontSize:11,color:"#5a6380",marginBottom:10}}>{p.position} · {p.team} · Age {p.age}</div>
+                        <div style={{fontSize:11,color:"#8a95b0",marginBottom:10}}>{p.position} · {p.team} · Age {p.age}</div>
                         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                           {p.origin&&<span className="pill" style={{background:"#4a9eff22",color:"#4a9eff",border:"1px solid #4a9eff44"}}>SOO</span>}
                           {p.intl&&<span className="pill" style={{background:"#f0c04022",color:"#f0c040",border:"1px solid #f0c04044"}}>Intl</span>}
@@ -1151,9 +1151,9 @@ export default function NRLValuation(){
                         </div>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
                           <div>
-                            <div style={{fontSize:10,color:"#5a6380",letterSpacing:1}}>MODEL VALUE</div>
+                            <div style={{fontSize:10,color:"#8a95b0",letterSpacing:1}}>MODEL VALUE</div>
                             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color,letterSpacing:2}}>{fmt(p.modelValue)}</div>
-                            <div style={{fontSize:10,color:"#5a6380"}}>Actual: {fmt(p.salary)}</div>
+                            <div style={{fontSize:10,color:"#8a95b0"}}>Actual: {fmt(p.salary)}</div>
                           </div>
                           <div style={{textAlign:"right"}}>
                             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:getRatioColor(p.ratio),letterSpacing:2}}>{p.ratio.toFixed(2)}x</div>
@@ -1166,24 +1166,24 @@ export default function NRLValuation(){
                 </div>
 
                 {/* Sub-score radar-style bars */}
-                <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,padding:"18px 20px",marginBottom:14}}>
-                  <div style={{fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Model Sub-Scores</div>
+                <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:10,padding:"18px 20px",marginBottom:14}}>
+                  <div style={{fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",marginBottom:14}}>Model Sub-Scores</div>
                   {SCORES.map(({key,label,color})=>{
                     const vA=pA[key]||0; const vB=pB[key]||0;
                     const winA=vA>vB; const winB=vB>vA;
                     return(
                       <div key={key} style={{marginBottom:12}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                          <span style={{fontSize:11,color:winA?"#00e5a0":"#8892aa",fontWeight:winA?600:400,minWidth:40}}>{Math.round(vA*100)}</span>
+                          <span style={{fontSize:11,color:winA?"#00e5a0":"#a8b2cc",fontWeight:winA?600:400,minWidth:40}}>{Math.round(vA*100)}</span>
                           <span style={{fontSize:10,color,letterSpacing:1,textTransform:"uppercase"}}>{label}</span>
-                          <span style={{fontSize:11,color:winB?"#4a9eff":"#8892aa",fontWeight:winB?600:400,minWidth:40,textAlign:"right"}}>{Math.round(vB*100)}</span>
+                          <span style={{fontSize:11,color:winB?"#4a9eff":"#a8b2cc",fontWeight:winB?600:400,minWidth:40,textAlign:"right"}}>{Math.round(vB*100)}</span>
                         </div>
                         <div style={{display:"flex",gap:3,alignItems:"center"}}>
                           {/* A bar — grows right to left */}
                           <div style={{flex:1,display:"flex",justifyContent:"flex-end"}}>
                             <div style={{width:`${Math.round(vA*100)}%`,height:8,background:"#00e5a0",borderRadius:"3px 0 0 3px",transition:"width 0.5s ease",opacity:winA?1:0.45}}/>
                           </div>
-                          <div style={{width:2,height:12,background:"#2a3040",flexShrink:0}}/>
+                          <div style={{width:2,height:12,background:"#3a4a64",flexShrink:0}}/>
                           {/* B bar — grows left to right */}
                           <div style={{flex:1}}>
                             <div style={{width:`${Math.round(vB*100)}%`,height:8,background:"#4a9eff",borderRadius:"0 3px 3px 0",transition:"width 0.5s ease",opacity:winB?1:0.45}}/>
@@ -1195,20 +1195,20 @@ export default function NRLValuation(){
                 </div>
 
                 {/* Stat-by-stat table */}
-                <div style={{background:"#111623",border:"1px solid #1e2535",borderRadius:10,overflow:"hidden"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",background:"#0d1117",borderBottom:"1px solid #1e2535"}}>
+                <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:10,overflow:"hidden"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",background:"#1a1f2e",borderBottom:"1px solid #2e3a52"}}>
                     <div style={{padding:"10px 14px",fontSize:10,color:"#00e5a0",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>{pA.name.split(" ").pop()}</div>
-                    <div style={{padding:"10px 14px",fontSize:10,color:"#5a6380",letterSpacing:2,textTransform:"uppercase",textAlign:"center"}}>STAT</div>
+                    <div style={{padding:"10px 14px",fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",textAlign:"center"}}>STAT</div>
                     <div style={{padding:"10px 14px",fontSize:10,color:"#4a9eff",letterSpacing:2,textTransform:"uppercase",fontWeight:700,textAlign:"right"}}>{pB.name.split(" ").pop()}</div>
                   </div>
                   {STATS.map(({label,fmtA,fmtB,numA,numB,higherBetter},i)=>{
                     const aWins=higherBetter?(numA>numB):(numA<numB);
                     const bWins=higherBetter?(numB>numA):(numB<numA);
                     return(
-                      <div key={label} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",borderBottom:i<STATS.length-1?"1px solid #0f1520":"none",background:i%2===0?"#111623":"#0f1520"}}>
-                        <div style={{padding:"9px 14px",fontSize:12,color:aWins?"#00e5a0":"#8892aa",fontWeight:aWins?600:400}}>{fmtA}</div>
-                        <div style={{padding:"9px 14px",fontSize:10,color:"#5a6380",letterSpacing:1,textAlign:"center",textTransform:"uppercase",alignSelf:"center"}}>{label}</div>
-                        <div style={{padding:"9px 14px",fontSize:12,color:bWins?"#4a9eff":"#8892aa",fontWeight:bWins?600:400,textAlign:"right"}}>{fmtB}</div>
+                      <div key={label} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",borderBottom:i<STATS.length-1?"1px solid #0f1520":"none",background:i%2===0?"#232b3e":"#1e2638"}}>
+                        <div style={{padding:"9px 14px",fontSize:12,color:aWins?"#00e5a0":"#a8b2cc",fontWeight:aWins?600:400}}>{fmtA}</div>
+                        <div style={{padding:"9px 14px",fontSize:10,color:"#8a95b0",letterSpacing:1,textAlign:"center",textTransform:"uppercase",alignSelf:"center"}}>{label}</div>
+                        <div style={{padding:"9px 14px",fontSize:12,color:bWins?"#4a9eff":"#a8b2cc",fontWeight:bWins?600:400,textAlign:"right"}}>{fmtB}</div>
                       </div>
                     );
                   })}
@@ -1219,15 +1219,15 @@ export default function NRLValuation(){
 
           {/* Placeholder when not both selected */}
           {!(compareA&&compareB)&&(
-            <div style={{textAlign:"center",padding:"60px 20px",color:"#3a4050",fontSize:13,letterSpacing:1}}>
+            <div style={{textAlign:"center",padding:"60px 20px",color:"#6a7590",fontSize:13,letterSpacing:1}}>
               SELECT TWO PLAYERS ABOVE TO COMPARE
             </div>
           )}
         </div>
       )}
 
-      <div style={{marginTop:14,fontSize:10,color:"#3a4050",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v19: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+      <div style={{marginTop:14,fontSize:10,color:"#6a7590",letterSpacing:1,lineHeight:1.9}}>
+        METHODOLOGY v20: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
