@@ -752,16 +752,19 @@ export default function NRLValuation(){
 
     {/* HEADER */}
     <div style={{background:"linear-gradient(135deg,#1a1f2e 0%,#222d40 100%)",borderBottom:"1px solid #2e3a52",padding:"28px 28px 20px"}}>
-      <div style={{maxWidth:1200,margin:"0 auto"}}>
-        <div style={{display:"flex",alignItems:"flex-end",gap:14,marginBottom:6,flexWrap:"wrap"}}>
-          {["NRL","VALUATION","ENGINE"].map((w,i)=>(
-            <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:i===0?"#fff":i===1?"#00e5a0":"#444"}}>{w}</span>
-          ))}
-          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#3a4a64",letterSpacing:3,paddingBottom:5}}>V20 · ALL CLUBS</span>
+      <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",gap:20}}>
+        <div>
+          <div style={{display:"flex",alignItems:"flex-end",gap:14,marginBottom:6,flexWrap:"wrap"}}>
+            {["NRL","VALUATION","ENGINE"].map((w)=>(
+              <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:"#ffffff"}}>{w}</span>
+            ))}
+            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#6a7a96",letterSpacing:3,paddingBottom:5}}>V21 · ALL CLUBS</span>
+          </div>
+          <div style={{fontSize:11,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase"}}>
+            {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
+          </div>
         </div>
-        <div style={{fontSize:11,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase"}}>
-          {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
-        </div>
+        <img src="https://www.nrl.com/.theme/nrl/badge.svg" alt="NRL" style={{height:68,width:"auto",opacity:0.90,flexShrink:0}}/>
       </div>
     </div>
 
@@ -1227,7 +1230,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#6a7590",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v20: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v21: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
