@@ -758,7 +758,7 @@ export default function NRLValuation(){
             {["NRL","VALUATION","ENGINE"].map((w)=>(
               <span key={w} style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:40,letterSpacing:4,lineHeight:1,color:"#ffffff"}}>{w}</span>
             ))}
-            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#6a7a96",letterSpacing:3,paddingBottom:5}}>V21 · ALL CLUBS</span>
+            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#6a7a96",letterSpacing:3,paddingBottom:5}}>V22 · ALL CLUBS</span>
           </div>
           <div style={{fontSize:11,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase"}}>
             {SEED_PLAYERS.length} players · 17 clubs · 2026 season · ${(SALARY_CAP/1e6).toFixed(2)}M cap · Position-banded valuation
@@ -773,7 +773,7 @@ export default function NRLValuation(){
       {/* WEIGHTS */}
       <div style={{background:"#232b3e",border:"1px solid #2e3a52",borderRadius:12,padding:"18px 22px",marginTop:20,marginBottom:14}}>
         <div style={{fontSize:10,color:"#8a95b0",letterSpacing:2,textTransform:"uppercase",marginBottom:16}}>
-          Model Weights — click <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:14,height:14,borderRadius:"50%",border:"1px solid #8a95b0",fontSize:9,color:"#8a95b0",fontFamily:"sans-serif",fontStyle:"normal",fontWeight:600,verticalAlign:"middle",marginBottom:1}}>i</span> for methodology
+          Model Weights — click <span style={{fontSize:14,color:"#8a95b0",verticalAlign:"middle"}}>ⓘ</span> for methodology
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:18}}>
           {WCONF.map(({key,label,color})=>(
@@ -1230,7 +1230,7 @@ export default function NRLValuation(){
       )}
 
       <div style={{marginTop:14,fontSize:10,color:"#6a7590",letterSpacing:1,lineHeight:1.9}}>
-        METHODOLOGY v21: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
+        METHODOLOGY v22: {SEED_PLAYERS.length} players across 17 NRL clubs. value = band_min + composite_score × (band_max − band_min) per position. Four weighted sub-scores (0–1). Cap = ${SALARY_CAP.toLocaleString()} (2026). Salary estimates from public reporting. Third-party deals excluded.
       </div>
     </div>
     </div>
